@@ -1,0 +1,2099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormSync - Real-time Collaborative Forms</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --danger: #ef4444;
+            --surface: #ffffff;
+            --surface-secondary: #f9fafb;
+            --surface-tertiary: #f3f4f6;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --text-tertiary: #9ca3af;
+            --border: #e5e7eb;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+            --radius-sm: 0.375rem;
+            --radius: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+            --transition: all 0.2s ease;
+            --transition-slow: all 0.3s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes ripple {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(2.4); opacity: 0; }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+
+        /* Landing Page */
+        .landing-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .landing-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        .landing-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius-xl);
+            padding: 48px;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: var(--shadow-2xl);
+            animation: fadeIn 0.6s ease-out;
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .logo p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .input-group {
+            margin-bottom: 24px;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            font-size: 1rem;
+            transition: var(--transition);
+            background: var(--surface);
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .input-field::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text-primary);
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--surface-secondary);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 32px;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+        }
+
+        /* Form Templates */
+        .template-grid {
+            display: none;
+            margin-top: 32px;
+            gap: 16px;
+        }
+
+        .template-card {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .template-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .template-card.selected {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .template-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+
+        .template-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .template-description {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Main App Layout */
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--surface-secondary);
+        }
+
+        .app-header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .brand-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .share-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 8px 16px;
+        }
+
+        .share-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .share-link {
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .copy-btn {
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .copy-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: white;
+            font-size: 1rem;
+            position: relative;
+        }
+
+        .user-avatar::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            background: var(--secondary);
+            border: 2px solid var(--surface);
+            border-radius: 50%;
+        }
+
+        /* Main Content Layout */
+        .app-content {
+            flex: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            gap: 24px;
+            height: calc(100vh - 73px);
+        }
+
+        /* Form Section */
+        .form-container {
+            background: var(--surface);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-secondary);
+        }
+
+        .form-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .form-description {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .form-content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .form-field {
+            margin-bottom: 24px;
+            animation: fadeIn 0.3s ease-out;
+            position: relative;
+        }
+
+        .field-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .field-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            font-size: 1rem;
+            transition: var(--transition);
+            background: var(--surface);
+            position: relative;
+        }
+
+        .field-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .field-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .field-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            padding-right: 40px;
+        }
+
+        .field-checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .field-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .field-indicator {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 12px;
+            border-radius: var(--radius);
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: var(--primary);
+            color: white;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: var(--transition);
+        }
+
+        .field-indicator.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .field-locked {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .field-locked .field-input {
+            background: var(--surface-tertiary);
+        }
+
+        /* Collaboration Sidebar */
+        .collab-container {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Online Users */
+        .users-card {
+            background: var(--surface);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+            padding: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .user-count {
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: var(--radius);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .users-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--surface-secondary);
+            border-radius: var(--radius-lg);
+            transition: var(--transition);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .user-item:hover {
+            background: var(--surface-tertiary);
+        }
+
+        .user-status {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: white;
+            font-size: 0.875rem;
+            position: relative;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .user-activity {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Video Chat */
+        .video-card {
+            background: var(--surface);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .video-grid {
+            flex: 1;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            overflow-y: auto;
+            background: var(--surface-tertiary);
+        }
+
+        .video-tile {
+            position: relative;
+            background: #000;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            box-shadow: var(--shadow);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .video-tile video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 12px;
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .video-name {
+            color: white;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .video-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .video-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .video-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .video-btn.muted {
+            background: rgba(239, 68, 68, 0.8);
+        }
+
+        /* Screenshots */
+        .screenshots-section {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 16px;
+        }
+
+        .screenshots-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .screenshot-btn {
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .screenshot-btn:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .screenshot-thumb {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            cursor: pointer;
+            transition: var(--transition);
+            border: 2px solid transparent;
+        }
+
+        .screenshot-thumb:hover {
+            border-color: var(--primary);
+            transform: scale(1.05);
+        }
+
+        .screenshot-thumb img {
+            width: 100%;
+            height: 60px;
+            object-fit: cover;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+            background: var(--surface);
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            box-shadow: var(--shadow-2xl);
+        }
+
+        .modal-content img {
+            max-width: 100%;
+            max-height: 80vh;
+            display: block;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 24px;
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            background: rgba(0, 0, 0, 0.7);
+            transform: rotate(90deg);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .app-content {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .collab-container {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 24px;
+            }
+
+            .video-card {
+                grid-column: span 2;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .landing-card {
+                padding: 32px 24px;
+            }
+
+            .header-content {
+                flex-wrap: wrap;
+            }
+
+            .app-content {
+                padding: 16px;
+                gap: 16px;
+            }
+
+            .collab-container {
+                grid-template-columns: 1fr;
+            }
+
+            .form-header,
+            .form-content,
+            .users-card,
+            .video-header {
+                padding: 16px;
+            }
+        }
+
+        /* Loading States */
+        .shimmer {
+            background: linear-gradient(90deg, var(--surface-tertiary) 25%, var(--surface-secondary) 50%, var(--surface-tertiary) 75%);
+            background-size: 1000px 100%;
+            animation: shimmer 2s infinite;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Utility Classes */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .text-sm {
+            font-size: 0.875rem;
+        }
+
+        .text-xs {
+            font-size: 0.75rem;
+        }
+
+        .font-medium {
+            font-weight: 500;
+        }
+
+        .font-semibold {
+            font-weight: 600;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .mt-4 {
+            margin-top: 1rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .justify-between {
+            justify-content: space-between;
+        }
+
+        .gap-2 {
+            gap: 0.5rem;
+        }
+
+        .gap-4 {
+            gap: 1rem;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--surface-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-tertiary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Landing Page -->
+    <div id="landingPage" class="landing-container">
+        <div class="landing-card">
+            <div class="logo">
+                <h1>FormSync</h1>
+                <p>Real-time collaborative forms with video chat</p>
+            </div>
+            
+            <div class="input-group">
+                <label class="input-label" for="userName">Your Name</label>
+                <input type="text" id="userName" class="input-field" placeholder="Enter your name" autocomplete="name">
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="showTemplates()">
+                    Create New Form
+                </button>
+                <button class="btn btn-secondary" onclick="showJoinForm()">
+                    Join Existing
+                </button>
+            </div>
+
+            <div id="joinSection" class="hidden mt-4">
+                <div class="input-group">
+                    <label class="input-label" for="joinCode">Form Code</label>
+                    <input type="text" id="joinCode" class="input-field" placeholder="Enter 6-character code">
+                </div>
+                <button class="btn btn-primary" style="width: 100%;" onclick="joinForm()">
+                    Join Form
+                </button>
+            </div>
+
+            <div id="templateSection" class="template-grid">
+                <div class="template-card" onclick="selectTemplate('feedback')" data-template="feedback">
+                    <div class="template-icon">📝</div>
+                    <div class="template-title">Customer Feedback</div>
+                    <div class="template-description">Collect user feedback and satisfaction ratings</div>
+                </div>
+                <div class="template-card" onclick="selectTemplate('application')" data-template="application">
+                    <div class="template-icon">📋</div>
+                    <div class="template-title">Job Application</div>
+                    <div class="template-description">Professional job application form</div>
+                </div>
+                <div class="template-card" onclick="selectTemplate('event')" data-template="event">
+                    <div class="template-icon">🎉</div>
+                    <div class="template-title">Event Registration</div>
+                    <div class="template-description">Event signup and attendee information</div>
+                </div>
+                <div class="template-card" onclick="selectTemplate('survey')" data-template="survey">
+                    <div class="template-icon">📊</div>
+                    <div class="template-title">Research Survey</div>
+                    <div class="template-description">Academic or market research questionnaire</div>
+                </div>
+                <button class="btn btn-primary mt-4" style="width: 100%;" onclick="createFormWithTemplate()">
+                    Create Form
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="app-container hidden">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-brand">
+                    <div class="brand-logo">F</div>
+                    <div class="brand-text">FormSync</div>
+                </div>
+                <div class="header-actions">
+                    <div class="share-container">
+                        <span class="share-label">Share Code:</span>
+                        <span class="share-link" id="shareCode"></span>
+                        <button class="copy-btn" onclick="copyShareCode()">Copy</button>
+                    </div>
+                    <div class="user-avatar" id="userAvatar"></div>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <!-- Form Section -->
+            <div class="form-container">
+                <div class="form-header">
+                    <h2 class="form-title" id="formTitle">Loading Form...</h2>
+                    <p class="form-description" id="formDescription">Please wait while we load the form</p>
+                </div>
+                <div class="form-content" id="formFields">
+                    <!-- Form fields will be dynamically inserted here -->
+                </div>
+            </div>
+
+            <!-- Collaboration Section -->
+            <div class="collab-container">
+                <!-- Online Users -->
+                <div class="users-card">
+                    <div class="card-header">
+                        <h3 class="card-title">Online Users</h3>
+                        <span class="user-count" id="userCount">1</span>
+                    </div>
+                    <div class="users-list" id="usersList">
+                        <!-- Users will be dynamically inserted here -->
+                    </div>
+                </div>
+
+                <!-- Video Chat -->
+                <div class="video-card">
+                    <div class="video-header">
+                        <h3 class="card-title">Video Chat</h3>
+                    </div>
+                    <div class="video-grid" id="videoGrid">
+                        <!-- Video tiles will be dynamically inserted here -->
+                    </div>
+                    <div class="screenshots-section">
+                        <div class="screenshots-header">
+                            <h4 class="text-sm font-semibold">Screenshots</h4>
+                            <button class="screenshot-btn" onclick="captureScreenshot()">
+                                📸 Capture
+                            </button>
+                        </div>
+                        <div class="screenshots-grid" id="screenshotsGrid">
+                            <!-- Screenshots will be dynamically inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Screenshot Modal -->
+    <div id="screenshotModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <img id="modalImage" src="" alt="Screenshot">
+        </div>
+    </div>
+
+    <script>
+        // Global State Management
+        const appState = {
+            currentUser: null,
+            formId: null,
+            formData: {},
+            formTemplate: null,
+            users: {},
+            fieldLocks: {},
+            screenshots: [],
+            localStream: null,
+            peerConnections: {},
+            dataChannels: {},
+            syncInterval: null,
+            lastSync: 0,
+            colors: [
+                '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#6366f1',
+                '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4'
+            ]
+        };
+
+        // Form Templates
+        const formTemplates = {
+            feedback: {
+                title: 'Customer Feedback Form',
+                description: 'Help us improve by sharing your experience',
+                fields: [
+                    { id: 'name', type: 'text', label: 'Full Name', required: true },
+                    { id: 'email', type: 'email', label: 'Email Address', required: true },
+                    { id: 'product', type: 'select', label: 'Product/Service', options: ['Product A', 'Product B', 'Product C', 'Other'], required: true },
+                    { id: 'rating', type: 'select', label: 'Overall Satisfaction', options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied'], required: true },
+                    { id: 'experience', type: 'textarea', label: 'Tell us about your experience', required: false },
+                    { id: 'recommend', type: 'checkbox', label: 'Would you recommend us to others?', required: false },
+                    { id: 'contact', type: 'checkbox', label: 'May we contact you for follow-up?', required: false }
+                ]
+            },
+            application: {
+                title: 'Job Application Form',
+                description: 'Apply for open positions at our company',
+                fields: [
+                    { id: 'fullname', type: 'text', label: 'Full Name', required: true },
+                    { id: 'email', type: 'email', label: 'Email Address', required: true },
+                    { id: 'phone', type: 'tel', label: 'Phone Number', required: true },
+                    { id: 'position', type: 'select', label: 'Position Applied For', options: ['Software Engineer', 'Product Manager', 'Designer', 'Marketing Manager', 'Sales Representative'], required: true },
+                    { id: 'experience', type: 'number', label: 'Years of Experience', required: true },
+                    { id: 'education', type: 'select', label: 'Highest Education', options: ['High School', 'Bachelor\'s Degree', 'Master\'s Degree', 'PhD', 'Other'], required: true },
+                    { id: 'startdate', type: 'date', label: 'Available Start Date', required: true },
+                    { id: 'salary', type: 'text', label: 'Expected Salary Range', required: false },
+                    { id: 'coverletter', type: 'textarea', label: 'Cover Letter', required: true },
+                    { id: 'remote', type: 'checkbox', label: 'Interested in remote work?', required: false }
+                ]
+            },
+            event: {
+                title: 'Event Registration Form',
+                description: 'Register for our upcoming event',
+                fields: [
+                    { id: 'name', type: 'text', label: 'Full Name', required: true },
+                    { id: 'email', type: 'email', label: 'Email Address', required: true },
+                    { id: 'organization', type: 'text', label: 'Organization/Company', required: false },
+                    { id: 'role', type: 'text', label: 'Job Title', required: false },
+                    { id: 'attendance', type: 'select', label: 'Attendance Type', options: ['In-Person', 'Virtual', 'Hybrid'], required: true },
+                    { id: 'sessions', type: 'select', label: 'Preferred Session Track', options: ['Technical', 'Business', 'Leadership', 'All Tracks'], required: true },
+                    { id: 'dietary', type: 'select', label: 'Dietary Restrictions', options: ['None', 'Vegetarian', 'Vegan', 'Gluten-Free', 'Other'], required: false },
+                    { id: 'tshirt', type: 'select', label: 'T-Shirt Size', options: ['S', 'M', 'L', 'XL', 'XXL'], required: false },
+                    { id: 'updates', type: 'checkbox', label: 'Send me event updates', required: false },
+                    { id: 'networking', type: 'checkbox', label: 'Interested in networking session', required: false }
+                ]
+            },
+            survey: {
+                title: 'Research Survey',
+                description: 'Your responses help us understand market trends',
+                fields: [
+                    { id: 'age', type: 'select', label: 'Age Group', options: ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'], required: true },
+                    { id: 'gender', type: 'select', label: 'Gender', options: ['Male', 'Female', 'Non-binary', 'Prefer not to say'], required: true },
+                    { id: 'location', type: 'text', label: 'City/State', required: true },
+                    { id: 'income', type: 'select', label: 'Annual Income Range', options: ['< $25k', '$25k-$50k', '$50k-$75k', '$75k-$100k', '> $100k'], required: false },
+                    { id: 'shopping', type: 'select', label: 'Online Shopping Frequency', options: ['Daily', 'Weekly', 'Monthly', 'Rarely', 'Never'], required: true },
+                    { id: 'brands', type: 'textarea', label: 'Favorite Brands (list up to 5)', required: false },
+                    { id: 'socialmedia', type: 'checkbox', label: 'Active on social media', required: false },
+                    { id: 'newsletter', type: 'checkbox', label: 'Subscribe to newsletters', required: false },
+                    { id: 'research', type: 'checkbox', label: 'Willing to participate in future research', required: false }
+                ]
+            }
+        };
+
+        // Initialize Application
+        window.addEventListener('DOMContentLoaded', () => {
+            // Check for form ID in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const formCode = urlParams.get('form');
+            if (formCode) {
+                document.getElementById('joinCode').value = formCode;
+                showJoinForm();
+            }
+        });
+
+        // Utility Functions
+        function generateFormId() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 6; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        function generateUserId() {
+            return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function getRandomColor() {
+            const usedColors = Object.values(appState.users).map(u => u.color);
+            const availableColors = appState.colors.filter(c => !usedColors.includes(c));
+            return availableColors.length > 0 
+                ? availableColors[Math.floor(Math.random() * availableColors.length)]
+                : appState.colors[Math.floor(Math.random() * appState.colors.length)];
+        }
+
+        function getUserInitials(name) {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().substr(0, 2);
+        }
+
+        // Landing Page Functions
+        function showTemplates() {
+            const userName = document.getElementById('userName').value.trim();
+            if (!userName) {
+                alert('Please enter your name');
+                return;
+            }
+
+            document.getElementById('templateSection').style.display = 'grid';
+            document.querySelector('.btn-group').style.display = 'none';
+            document.getElementById('joinSection').classList.add('hidden');
+        }
+
+        function showJoinForm() {
+            document.getElementById('joinSection').classList.remove('hidden');
+            document.getElementById('templateSection').style.display = 'none';
+        }
+
+        function selectTemplate(templateId) {
+            document.querySelectorAll('.template-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.querySelector(`[data-template="${templateId}"]`).classList.add('selected');
+            appState.formTemplate = templateId;
+        }
+
+        function createFormWithTemplate() {
+            if (!appState.formTemplate) {
+                alert('Please select a form template');
+                return;
+            }
+
+            const userName = document.getElementById('userName').value.trim();
+            if (!userName) {
+                alert('Please enter your name');
+                return;
+            }
+
+            // Create user and form
+            appState.currentUser = {
+                id: generateUserId(),
+                name: userName,
+                color: getRandomColor(),
+                initials: getUserInitials(userName)
+            };
+            appState.formId = generateFormId();
+
+            // Save form template
+            const template = formTemplates[appState.formTemplate];
+            localStorage.setItem(`form_${appState.formId}`, JSON.stringify({
+                template: appState.formTemplate,
+                title: template.title,
+                description: template.description,
+                fields: template.fields,
+                created: Date.now(),
+                createdBy: appState.currentUser.id
+            }));
+
+            // Initialize app
+            initializeApp();
+        }
+
+        function joinForm() {
+            const userName = document.getElementById('userName').value.trim();
+            const joinCode = document.getElementById('joinCode').value.trim().toUpperCase();
+
+            if (!userName || !joinCode) {
+                alert('Please enter your name and form code');
+                return;
+            }
+
+            // Check if form exists
+            const formData = localStorage.getItem(`form_${joinCode}`);
+            if (!formData) {
+                alert('Form not found. Please check the code and try again.');
+                return;
+            }
+
+            // Create user and join form
+            appState.currentUser = {
+                id: generateUserId(),
+                name: userName,
+                color: getRandomColor(),
+                initials: getUserInitials(userName)
+            };
+            appState.formId = joinCode;
+
+            // Initialize app
+            initializeApp();
+        }
+
+        // Main App Initialization
+        function initializeApp() {
+            // Hide landing page
+            document.getElementById('landingPage').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+
+            // Set user info
+            const userAvatar = document.getElementById('userAvatar');
+            userAvatar.textContent = appState.currentUser.initials;
+            userAvatar.style.backgroundColor = appState.currentUser.color;
+
+            // Set share code
+            document.getElementById('shareCode').textContent = appState.formId;
+
+            // Update URL
+            const newUrl = `${window.location.origin}${window.location.pathname}?form=${appState.formId}`;
+            window.history.replaceState({}, '', newUrl);
+
+            // Load form
+            loadForm();
+
+            // Start real-time sync
+            startRealtimeSync();
+
+            // Initialize video chat
+            initializeVideoChat();
+
+            // Set up cleanup
+            window.addEventListener('beforeunload', cleanup);
+        }
+
+        function loadForm() {
+            const formData = JSON.parse(localStorage.getItem(`form_${appState.formId}`));
+            if (!formData) {
+                console.error('Form data not found');
+                return;
+            }
+
+            // Set form info
+            document.getElementById('formTitle').textContent = formData.title;
+            document.getElementById('formDescription').textContent = formData.description;
+
+            // Render form fields
+            const formFieldsContainer = document.getElementById('formFields');
+            formFieldsContainer.innerHTML = formData.fields.map(field => {
+                const fieldId = `field_${field.id}`;
+                let fieldHTML = '';
+
+                switch (field.type) {
+                    case 'text':
+                    case 'email':
+                    case 'tel':
+                    case 'number':
+                    case 'date':
+                        fieldHTML = `
+                            <div class="form-field" data-field-id="${field.id}">
+                                <label class="field-label" for="${fieldId}">
+                                    ${field.label}${field.required ? ' *' : ''}
+                                </label>
+                                <input 
+                                    type="${field.type}" 
+                                    id="${fieldId}" 
+                                    class="field-input"
+                                    ${field.required ? 'required' : ''}
+                                    onchange="updateFieldValue('${field.id}')"
+                                    onfocus="lockField('${field.id}')"
+                                    onblur="unlockField('${field.id}')"
+                                    oninput="handleFieldInput('${field.id}')"
+                                >
+                                <div class="field-indicator" id="indicator_${field.id}"></div>
+                            </div>
+                        `;
+                        break;
+
+                    case 'textarea':
+                        fieldHTML = `
+                            <div class="form-field" data-field-id="${field.id}">
+                                <label class="field-label" for="${fieldId}">
+                                    ${field.label}${field.required ? ' *' : ''}
+                                </label>
+                                <textarea 
+                                    id="${fieldId}" 
+                                    class="field-input field-textarea"
+                                    ${field.required ? 'required' : ''}
+                                    onchange="updateFieldValue('${field.id}')"
+                                    onfocus="lockField('${field.id}')"
+                                    onblur="unlockField('${field.id}')"
+                                    oninput="handleFieldInput('${field.id}')"
+                                ></textarea>
+                                <div class="field-indicator" id="indicator_${field.id}"></div>
+                            </div>
+                        `;
+                        break;
+
+                    case 'select':
+                        fieldHTML = `
+                            <div class="form-field" data-field-id="${field.id}">
+                                <label class="field-label" for="${fieldId}">
+                                    ${field.label}${field.required ? ' *' : ''}
+                                </label>
+                                <select 
+                                    id="${fieldId}" 
+                                    class="field-input field-select"
+                                    ${field.required ? 'required' : ''}
+                                    onchange="updateFieldValue('${field.id}')"
+                                    onfocus="lockField('${field.id}')"
+                                    onblur="unlockField('${field.id}')"
+                                >
+                                    <option value="">Select an option</option>
+                                    ${field.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                                </select>
+                                <div class="field-indicator" id="indicator_${field.id}"></div>
+                            </div>
+                        `;
+                        break;
+
+                    case 'checkbox':
+                        fieldHTML = `
+                            <div class="form-field" data-field-id="${field.id}">
+                                <div class="field-checkbox-container">
+                                    <input 
+                                        type="checkbox" 
+                                        id="${fieldId}" 
+                                        class="field-checkbox"
+                                        onchange="updateFieldValue('${field.id}')"
+                                        onfocus="lockField('${field.id}')"
+                                        onblur="unlockField('${field.id}')"
+                                    >
+                                    <label class="field-label" for="${fieldId}" style="margin-bottom: 0;">
+                                        ${field.label}
+                                    </label>
+                                </div>
+                                <div class="field-indicator" id="indicator_${field.id}"></div>
+                            </div>
+                        `;
+                        break;
+                }
+
+                return fieldHTML;
+            }).join('');
+        }
+
+        // Real-time Sync Functions
+        function startRealtimeSync() {
+            // Register user
+            appState.users[appState.currentUser.id] = appState.currentUser;
+            updateUserPresence();
+
+            // Start sync interval - faster for better responsiveness
+            appState.syncInterval = setInterval(() => {
+                syncData();
+            }, 100); // 100ms for near real-time updates
+
+            // Initial sync
+            syncData();
+        }
+
+        function syncData() {
+            const syncKey = `sync_${appState.formId}`;
+            const now = Date.now();
+
+            // Get current sync data
+            let syncData = JSON.parse(localStorage.getItem(syncKey) || '{}');
+            if (!syncData.users) syncData.users = {};
+            if (!syncData.formData) syncData.formData = {};
+            if (!syncData.fieldLocks) syncData.fieldLocks = {};
+            if (!syncData.screenshots) syncData.screenshots = [];
+            if (!syncData.webrtc) syncData.webrtc = {};
+
+            // Update user presence
+            syncData.users[appState.currentUser.id] = {
+                ...appState.currentUser,
+                lastSeen: now
+            };
+
+            // Clean up inactive users (not seen in 3 seconds)
+            Object.keys(syncData.users).forEach(userId => {
+                if (userId !== appState.currentUser.id && now - syncData.users[userId].lastSeen > 3000) {
+                    delete syncData.users[userId];
+                    // Clean up their locks
+                    Object.keys(syncData.fieldLocks).forEach(fieldId => {
+                        if (syncData.fieldLocks[fieldId] === userId) {
+                            delete syncData.fieldLocks[fieldId];
+                        }
+                    });
+                    handleUserDisconnected(userId);
+                }
+            });
+
+            // Update field locks
+            Object.keys(appState.fieldLocks).forEach(fieldId => {
+                syncData.fieldLocks[fieldId] = appState.fieldLocks[fieldId];
+            });
+
+            // Update form data
+            Object.keys(appState.formData).forEach(fieldId => {
+                syncData.formData[fieldId] = appState.formData[fieldId];
+            });
+
+            // Save sync data
+            try {
+                localStorage.setItem(syncKey, JSON.stringify(syncData));
+            } catch (e) {
+                console.error('Failed to save sync data:', e);
+            }
+
+            // Process updates from other users
+            processRemoteUpdates(syncData);
+
+            // Update UI
+            updateUsersList();
+            updateFieldIndicators();
+        }
+
+        function processRemoteUpdates(syncData) {
+            // Update users
+            Object.keys(syncData.users).forEach(userId => {
+                if (userId !== appState.currentUser.id && !appState.users[userId]) {
+                    // New user joined
+                    appState.users[userId] = syncData.users[userId];
+                    createPeerConnection(userId);
+                }
+            });
+            appState.users = syncData.users;
+
+            // Update field locks
+            Object.keys(syncData.fieldLocks).forEach(fieldId => {
+                if (syncData.fieldLocks[fieldId] !== appState.currentUser.id) {
+                    const field = document.querySelector(`[data-field-id="${fieldId}"]`);
+                    if (field) {
+                        const user = appState.users[syncData.fieldLocks[fieldId]];
+                        if (user) {
+                            field.classList.add('field-locked');
+                            field.querySelector('.field-input').style.borderColor = user.color;
+                        }
+                    }
+                }
+            });
+
+            // Unlock fields that are no longer locked
+            document.querySelectorAll('.field-locked').forEach(field => {
+                const fieldId = field.dataset.fieldId;
+                if (!syncData.fieldLocks[fieldId] || syncData.fieldLocks[fieldId] === appState.currentUser.id) {
+                    field.classList.remove('field-locked');
+                    field.querySelector('.field-input').style.borderColor = '';
+                }
+            });
+
+            // Update form data
+            Object.keys(syncData.formData).forEach(fieldId => {
+                if (!appState.fieldLocks[fieldId] || appState.fieldLocks[fieldId] !== appState.currentUser.id) {
+                    const fieldElement = document.getElementById(`field_${fieldId}`);
+                    if (fieldElement && syncData.formData[fieldId] !== appState.formData[fieldId]) {
+                        if (fieldElement.type === 'checkbox') {
+                            fieldElement.checked = syncData.formData[fieldId];
+                        } else {
+                            fieldElement.value = syncData.formData[fieldId] || '';
+                        }
+                        appState.formData[fieldId] = syncData.formData[fieldId];
+                    }
+                }
+            });
+
+            // Update screenshots
+            if (syncData.screenshots.length !== appState.screenshots.length) {
+                appState.screenshots = syncData.screenshots;
+                updateScreenshots();
+            }
+
+            // Process WebRTC signaling
+            processWebRTCSignaling(syncData.webrtc);
+        }
+
+        function updateUserPresence() {
+            const userCount = Object.keys(appState.users).length;
+            document.getElementById('userCount').textContent = userCount;
+        }
+
+        function updateUsersList() {
+            const usersList = document.getElementById('usersList');
+            const currentUsers = Object.values(appState.users).filter(u => u.id);
+            
+            usersList.innerHTML = currentUsers.map(user => {
+                const isCurrentUser = user.id === appState.currentUser.id;
+                const activity = getUse
+
+rActivity(user.id);
+                
+                return `
+                    <div class="user-item" data-user-id="${user.id}">
+                        <div class="user-status" style="background-color: ${user.color}">
+                            ${user.initials || getUserInitials(user.name)}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">${user.name}${isCurrentUser ? ' (You)' : ''}</div>
+                            <div class="user-activity">${activity}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            updateUserPresence();
+        }
+
+        function getUserActivity(userId) {
+            // Check if user is editing any field
+            for (const [fieldId, lockUserId] of Object.entries(appState.fieldLocks)) {
+                if (lockUserId === userId) {
+                    const field = document.querySelector(`[data-field-id="${fieldId}"] .field-label`);
+                    if (field) {
+                        return `Editing ${field.textContent.replace(' *', '')}`;
+                    }
+                }
+            }
+            return 'Active';
+        }
+
+        // Form Field Functions
+        function lockField(fieldId) {
+            appState.fieldLocks[fieldId] = appState.currentUser.id;
+            const indicator = document.getElementById(`indicator_${fieldId}`);
+            if (indicator) {
+                indicator.textContent = 'Editing...';
+                indicator.classList.add('active');
+            }
+        }
+
+        function unlockField(fieldId) {
+            if (appState.fieldLocks[fieldId] === appState.currentUser.id) {
+                delete appState.fieldLocks[fieldId];
+                const indicator = document.getElementById(`indicator_${fieldId}`);
+                if (indicator) {
+                    indicator.classList.remove('active');
+                }
+            }
+        }
+
+        function updateFieldValue(fieldId) {
+            const fieldElement = document.getElementById(`field_${fieldId}`);
+            if (fieldElement) {
+                if (fieldElement.type === 'checkbox') {
+                    appState.formData[fieldId] = fieldElement.checked;
+                } else {
+                    appState.formData[fieldId] = fieldElement.value;
+                }
+            }
+        }
+
+        function handleFieldInput(fieldId) {
+            // Debounced update for text fields
+            clearTimeout(appState[`fieldTimer_${fieldId}`]);
+            appState[`fieldTimer_${fieldId}`] = setTimeout(() => {
+                updateFieldValue(fieldId);
+            }, 300);
+        }
+
+        function updateFieldIndicators() {
+            Object.entries(appState.fieldLocks).forEach(([fieldId, userId]) => {
+                const indicator = document.getElementById(`indicator_${fieldId}`);
+                if (indicator && userId !== appState.currentUser.id) {
+                    const user = appState.users[userId];
+                    if (user) {
+                        indicator.textContent = `${user.name} is editing`;
+                        indicator.style.backgroundColor = user.color;
+                        indicator.classList.add('active');
+                    }
+                }
+            });
+        }
+
+        // Video Chat Functions
+        async function initializeVideoChat() {
+            try {
+                appState.localStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+
+                addVideoStream(appState.currentUser.id, appState.localStream, true);
+
+                // Connect to other users
+                Object.keys(appState.users).forEach(userId => {
+                    if (userId !== appState.currentUser.id) {
+                        createPeerConnection(userId);
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to initialize video:', error);
+                // Continue without video
+            }
+        }
+
+        function createPeerConnection(remoteUserId) {
+            if (appState.peerConnections[remoteUserId]) return;
+
+            const pc = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            });
+
+            appState.peerConnections[remoteUserId] = pc;
+
+            // Add local stream
+            if (appState.localStream) {
+                appState.localStream.getTracks().forEach(track => {
+                    pc.addTrack(track, appState.localStream);
+                });
+            }
+
+            // Handle remote stream
+            pc.ontrack = (event) => {
+                addVideoStream(remoteUserId, event.streams[0], false);
+            };
+
+            // Handle ICE candidates
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    sendWebRTCSignal(remoteUserId, {
+                        type: 'ice-candidate',
+                        candidate: event.candidate
+                    });
+                }
+            };
+
+            // Create offer if we should initiate
+            if (appState.currentUser.id < remoteUserId) {
+                createOffer(remoteUserId);
+            }
+        }
+
+        async function createOffer(remoteUserId) {
+            const pc = appState.peerConnections[remoteUserId];
+            if (!pc) return;
+
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendWebRTCSignal(remoteUserId, {
+                    type: 'offer',
+                    offer: offer
+                });
+            } catch (error) {
+                console.error('Failed to create offer:', error);
+            }
+        }
+
+        async function handleOffer(remoteUserId, offer) {
+            if (!appState.peerConnections[remoteUserId]) {
+                createPeerConnection(remoteUserId);
+            }
+
+            const pc = appState.peerConnections[remoteUserId];
+            if (!pc) return;
+
+            try {
+                await pc.setRemoteDescription(new RTCSessionDescription(offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                sendWebRTCSignal(remoteUserId, {
+                    type: 'answer',
+                    answer: answer
+                });
+            } catch (error) {
+                console.error('Failed to handle offer:', error);
+            }
+        }
+
+        async function handleAnswer(remoteUserId, answer) {
+            const pc = appState.peerConnections[remoteUserId];
+            if (!pc) return;
+
+            try {
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            } catch (error) {
+                console.error('Failed to handle answer:', error);
+            }
+        }
+
+        async function handleIceCandidate(remoteUserId, candidate) {
+            const pc = appState.peerConnections[remoteUserId];
+            if (!pc) return;
+
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (error) {
+                console.error('Failed to add ICE candidate:', error);
+            }
+        }
+
+        function sendWebRTCSignal(targetUserId, signal) {
+            const syncKey = `sync_${appState.formId}`;
+            const syncData = JSON.parse(localStorage.getItem(syncKey) || '{}');
+            
+            if (!syncData.webrtc) syncData.webrtc = {};
+            
+            const signalKey = `${appState.currentUser.id}_${targetUserId}_${Date.now()}`;
+            syncData.webrtc[signalKey] = {
+                from: appState.currentUser.id,
+                to: targetUserId,
+                signal: signal,
+                timestamp: Date.now()
+            };
+            
+            // Clean old signals (older than 10 seconds)
+            Object.keys(syncData.webrtc).forEach(key => {
+                if (Date.now() - syncData.webrtc[key].timestamp > 10000) {
+                    delete syncData.webrtc[key];
+                }
+            });
+            
+            localStorage.setItem(syncKey, JSON.stringify(syncData));
+        }
+
+        function processWebRTCSignaling(webrtcData) {
+            if (!webrtcData) return;
+
+            Object.entries(webrtcData).forEach(([key, data]) => {
+                if (data.to === appState.currentUser.id && data.timestamp > appState.lastSync) {
+                    const signal = data.signal;
+                    switch (signal.type) {
+                        case 'offer':
+                            handleOffer(data.from, signal.offer);
+                            break;
+                        case 'answer':
+                            handleAnswer(data.from, signal.answer);
+                            break;
+                        case 'ice-candidate':
+                            handleIceCandidate(data.from, signal.candidate);
+                            break;
+                    }
+                }
+            });
+
+            appState.lastSync = Date.now();
+        }
+
+        function addVideoStream(userId, stream, isLocal) {
+            const videoGrid = document.getElementById('videoGrid');
+            let videoTile = document.getElementById(`video_${userId}`);
+
+            if (!videoTile) {
+                const user = appState.users[userId];
+                videoTile = document.createElement('div');
+                videoTile.id = `video_${userId}`;
+                videoTile.className = 'video-tile';
+                videoTile.innerHTML = `
+                    <video ${isLocal ? 'muted' : ''} autoplay playsinline></video>
+                    <div class="video-overlay">
+                        <span class="video-name">${user ? user.name : 'Unknown'}</span>
+                        <div class="video-controls">
+                            ${isLocal ? `
+                                <button class="video-btn" onclick="toggleAudio('${userId}')" title="Toggle Audio">
+                                    🎤
+                                </button>
+                                <button class="video-btn" onclick="toggleVideo('${userId}')" title="Toggle Video">
+                                    📹
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                videoGrid.appendChild(videoTile);
+            }
+
+            const video = videoTile.querySelector('video');
+            video.srcObject = stream;
+        }
+
+        function toggleAudio(userId) {
+            if (userId === appState.currentUser.id && appState.localStream) {
+                const audioTrack = appState.localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    const button = document.querySelector(`#video_${userId} .video-btn:first-child`);
+                    if (button) {
+                        button.classList.toggle('muted', !audioTrack.enabled);
+                        button.textContent = audioTrack.enabled ? '🎤' : '🔇';
+                    }
+                }
+            }
+        }
+
+        function toggleVideo(userId) {
+            if (userId === appState.currentUser.id && appState.localStream) {
+                const videoTrack = appState.localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    videoTrack.enabled = !videoTrack.enabled;
+                    const button = document.querySelector(`#video_${userId} .video-btn:last-child`);
+                    if (button) {
+                        button.classList.toggle('muted', !videoTrack.enabled);
+                        button.textContent = videoTrack.enabled ? '📹' : '📵';
+                    }
+                }
+            }
+        }
+
+        function handleUserDisconnected(userId) {
+            // Remove video
+            const videoTile = document.getElementById(`video_${userId}`);
+            if (videoTile) {
+                videoTile.remove();
+            }
+
+            // Close peer connection
+            if (appState.peerConnections[userId]) {
+                appState.peerConnections[userId].close();
+                delete appState.peerConnections[userId];
+            }
+        }
+
+        // Screenshot Functions
+        async function captureScreenshot() {
+            const videoGrid = document.getElementById('videoGrid');
+            const videos = videoGrid.querySelectorAll('video');
+
+            if (videos.length === 0) {
+                alert('No videos to capture');
+                return;
+            }
+
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Calculate grid dimensions
+            const gridCols = Math.ceil(Math.sqrt(videos.length));
+            const gridRows = Math.ceil(videos.length / gridCols);
+            const cellWidth = 320;
+            const cellHeight = 180;
+            
+            canvas.width = gridCols * cellWidth;
+            canvas.height = gridRows * cellHeight;
+
+            // Draw background
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw each video
+            videos.forEach((video, index) => {
+                if (video.readyState >= 2) {
+                    const col = index % gridCols;
+                    const row = Math.floor(index / gridCols);
+                    const x = col * cellWidth;
+                    const y = row * cellHeight;
+
+                    // Draw video
+                    ctx.drawImage(video, x + 5, y + 5, cellWidth - 10, cellHeight - 10);
+
+                    // Draw name overlay
+                    const videoTile = video.closest('.video-tile');
+                    const nameElement = videoTile?.querySelector('.video-name');
+                    if (nameElement) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                        ctx.fillRect(x + 5, y + cellHeight - 35, cellWidth - 10, 30);
+                        ctx.fillStyle = 'white';
+                        ctx.font = '14px sans-serif';
+                        ctx.fillText(nameElement.textContent, x + 15, y + cellHeight - 15);
+                    }
+                }
+            });
+
+            // Save screenshot
+            const screenshot = {
+                id: Date.now().toString(),
+                data: canvas.toDataURL('image/jpeg', 0.8),
+                timestamp: Date.now(),
+                user: appState.currentUser.name
+            };
+
+            // Add to screenshots (keep last 10)
+            appState.screenshots.push(screenshot);
+            if (appState.screenshots.length > 10) {
+                appState.screenshots.shift();
+            }
+
+            // Update sync data
+            const syncKey = `sync_${appState.formId}`;
+            const syncData = JSON.parse(localStorage.getItem(syncKey) || '{}');
+            syncData.screenshots = appState.screenshots;
+            localStorage.setItem(syncKey, JSON.stringify(syncData));
+
+            updateScreenshots();
+
+            // Visual feedback
+            const btn = document.querySelector('.screenshot-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '✅ Captured!';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+            }, 1500);
+        }
+
+        function updateScreenshots() {
+            const grid = document.getElementById('screenshotsGrid');
+            grid.innerHTML = appState.screenshots.map(screenshot => `
+                <div class="screenshot-thumb" onclick="viewScreenshot('${screenshot.id}')">
+                    <img src="${screenshot.data}" alt="Screenshot by ${screenshot.user}">
+                </div>
+            `).join('');
+        }
+
+        function viewScreenshot(screenshotId) {
+            const screenshot = appState.screenshots.find(s => s.id === screenshotId);
+            if (screenshot) {
+                document.getElementById('modalImage').src = screenshot.data;
+                document.getElementById('screenshotModal').classList.add('active');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('screenshotModal').classList.remove('active');
+        }
+
+        // Utility Functions
+        function copyShareCode() {
+            const shareCode = appState.formId;
+            const shareUrl = `${window.location.origin}${window.location.pathname}?form=${shareCode}`;
+            
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(() => {
+                // Fallback
+                const textArea = document.createElement('textarea');
+                textArea.value = shareUrl;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+
+        function cleanup() {
+            // Stop sync
+            if (appState.syncInterval) {
+                clearInterval(appState.syncInterval);
+            }
+
+            // Remove user from sync data
+            const syncKey = `sync_${appState.formId}`;
+            const syncData = JSON.parse(localStorage.getItem(syncKey) || '{}');
+            if (syncData.users) {
+                delete syncData.users[appState.currentUser.id];
+            }
+            
+            // Clear user's locks
+            if (syncData.fieldLocks) {
+                Object.keys(syncData.fieldLocks).forEach(fieldId => {
+                    if (syncData.fieldLocks[fieldId] === appState.currentUser.id) {
+                        delete syncData.fieldLocks[fieldId];
+                    }
+                });
+            }
+            
+            localStorage.setItem(syncKey, JSON.stringify(syncData));
+
+            // Stop local stream
+            if (appState.localStream) {
+                appState.localStream.getTracks().forEach(track => track.stop());
+            }
+
+            // Close peer connections
+            Object.values(appState.peerConnections).forEach(pc => pc.close());
+        }
+    </script>
+</body>
+</html>
