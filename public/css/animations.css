@@ -1,0 +1,197 @@
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-5px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(5px);
+    }
+}
+
+/* Animation Classes */
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+.slide-out {
+    animation: slideOut 0.3s ease-out;
+}
+
+.pulse {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+.bounce {
+    animation: bounce 1s ease-in-out infinite;
+}
+
+.shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Transition Classes */
+.transition-all {
+    transition: all var(--transition-base);
+}
+
+.transition-opacity {
+    transition: opacity var(--transition-base);
+}
+
+.transition-transform {
+    transition: transform var(--transition-base);
+}
+
+.transition-colors {
+    transition: color var(--transition-base), background-color var(--transition-base), border-color var(--transition-base);
+}
+
+/* Hover Effects */
+.hover-grow:hover {
+    transform: scale(1.05);
+}
+
+.hover-shrink:hover {
+    transform: scale(0.95);
+}
+
+.hover-rotate:hover {
+    transform: rotate(5deg);
+}
+
+.hover-shadow:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+/* Loading Spinner */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.spinner-small {
+    width: 20px;
+    height: 20px;
+    border-width: 2px;
+}
+
+.spinner-large {
+    width: 60px;
+    height: 60px;
+    border-width: 4px;
+}
+
+/* Skeleton Loading */
+.skeleton {
+    background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-300) 50%, var(--gray-200) 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Ripple Effect */
+.ripple {
+    position: relative;
+    overflow: hidden;
+}
+
+.ripple::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.ripple:active::before {
+    width: 300px;
+    height: 300px;
+} 

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormSync - Real-time Collaborative Forms</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/animations.css">
+    
+    <!-- Socket.io from CDN -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Landing Page -->
+    <div id="landing-page" class="page active">
+        <div class="landing-container">
+            <div class="landing-card">
+                <div class="landing-header">
+                    <h1 class="gradient-text">FormSync</h1>
+                    <p class="subtitle">Real-time collaborative forms with video chat</p>
+                </div>
+                
+                <div class="form-section">
+                    <div class="input-group">
+                        <label for="userName">Your Name</label>
+                        <input type="text" id="userName" placeholder="Enter your name" class="input-field">
+                    </div>
+                    
+                    <div id="action-buttons" class="button-group">
+                        <button id="createFormBtn" class="btn btn-primary">Create New Form</button>
+                        <button id="joinFormBtn" class="btn btn-secondary">Join Existing</button>
+                    </div>
+                    
+                    <!-- Join Form Section -->
+                    <div id="join-section" class="hidden">
+                        <div class="input-group">
+                            <label for="formCode">Form Code</label>
+                            <input type="text" id="formCode" placeholder="Enter 6-character code" maxlength="6" class="input-field uppercase">
+                        </div>
+                        <button id="joinBtn" class="btn btn-primary full-width">Join Form</button>
+                    </div>
+                    
+                    <!-- Template Selection -->
+                    <div id="template-section" class="hidden">
+                        <div class="template-grid" id="templateGrid">
+                            <!-- Templates will be inserted here -->
+                        </div>
+                        <button id="createBtn" class="btn btn-primary full-width" disabled>Create Form</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Form Page -->
+    <div id="form-page" class="page hidden">
+        <header class="form-header">
+            <div class="header-left">
+                <h2 id="formTitle" class="form-title"></h2>
+                <p id="formDescription" class="form-description"></p>
+            </div>
+            <div class="header-right">
+                <div class="form-code-display">
+                    <span class="code-label">Form Code:</span>
+                    <span id="formCodeDisplay" class="code-value"></span>
+                    <button id="copyCodeBtn" class="copy-btn" title="Copy code">📋</button>
+                </div>
+                <div class="active-users" id="activeUsers">
+                    <!-- Active users will be displayed here -->
+                </div>
+            </div>
+        </header>
+        
+        <div class="form-container">
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>Video Chat</h3>
+                    <div id="videoContainer" class="video-container">
+                        <video id="localVideo" class="video-stream" autoplay muted></video>
+                        <div id="remoteVideos" class="remote-videos">
+                            <!-- Remote video streams will be added here -->
+                        </div>
+                    </div>
+                    <div class="video-controls">
+                        <button id="toggleVideo" class="control-btn">📹</button>
+                        <button id="toggleAudio" class="control-btn">🎤</button>
+                        <button id="shareScreen" class="control-btn">🖥️</button>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <h3>Screenshots</h3>
+                    <button id="captureScreenshot" class="btn btn-secondary full-width">📸 Capture Screenshot</button>
+                    <div id="screenshotsList" class="screenshots-list">
+                        <!-- Screenshots will be displayed here -->
+                    </div>
+                </div>
+            </aside>
+            
+            <main class="form-main">
+                <form id="collaborativeForm" class="collaborative-form">
+                    <div id="formFields" class="form-fields">
+                        <!-- Form fields will be dynamically inserted here -->
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Submit Form</button>
+                        <button type="button" id="saveProgressBtn" class="btn btn-secondary">Save Progress</button>
+                    </div>
+                </form>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+    
+    <!-- Scripts -->
+    <script src="js/utils/constants.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/utils/toast.js"></script>
+    <script src="js/services/store.js"></script>
+    <script src="js/services/socket.js"></script>
+    <script src="js/services/api.js"></script>
+    <script src="js/services/webrtc.js"></script>
+    <script src="js/components/landing.js"></script>
+    <script src="js/components/form.js"></script>
+    <script src="js/components/video.js"></script>
+    <script src="js/components/screenshots.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html> 
