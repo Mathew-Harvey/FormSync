@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormSync Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>FormSync Application Test</h1>
+    
+    <div class="test-section">
+        <h2>Quick Links</h2>
+        <button onclick="window.open('http://localhost:8080', '_blank')">Open App (Port 8080)</button>
+        <button onclick="window.open('http://localhost:3001/health', '_blank')">Check Server Health</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Results</h2>
+        <div id="results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Manual Test Steps</h2>
+        <ol>
+            <li>Open the app in two different browser tabs</li>
+            <li>Enter a name and create a form in the first tab</li>
+            <li>Copy the form code</li>
+            <li>In the second tab, enter a different name and join with the code</li>
+            <li>Test field editing - should see real-time updates</li>
+            <li>Test field locking - when one user edits, other should see lock</li>
+            <li>Test screenshots - should work without video</li>
+            <li>Close one tab and reopen - should restore state</li>
+            <li>Test offline mode - stop the server and verify app still works</li>
+        </ol>
+    </div>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+        }
+        
+        // Test localStorage
+        try {
+            localStorage.setItem('test', 'value');
+            localStorage.removeItem('test');
+            addResult('✓ localStorage is working', 'success');
+        } catch (e) {
+            addResult('✗ localStorage error: ' + e.message, 'error');
+        }
+        
+        // Test sessionStorage
+        try {
+            sessionStorage.setItem('test', 'value');
+            sessionStorage.removeItem('test');
+            addResult('✓ sessionStorage is working', 'success');
+        } catch (e) {
+            addResult('✗ sessionStorage error: ' + e.message, 'error');
+        }
+        
+        // Check server health
+        fetch('http://localhost:3001/health')
+            .then(res => res.json())
+            .then(data => {
+                addResult('✓ Server is running: ' + JSON.stringify(data), 'success');
+            })
+            .catch(err => {
+                addResult('✗ Server not responding (this is OK for offline mode)', 'info');
+            });
+        
+        // Check if app is accessible
+        fetch('http://localhost:8080')
+            .then(res => {
+                if (res.ok) {
+                    addResult('✓ Frontend is accessible on port 8080', 'success');
+                } else {
+                    addResult('✗ Frontend returned status: ' + res.status, 'error');
+                }
+            })
+            .catch(err => {
+                addResult('✗ Frontend not accessible: ' + err.message, 'error');
+            });
+    </script>
+</body>
+</html> 

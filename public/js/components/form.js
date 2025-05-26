@@ -195,13 +195,27 @@ class FormManager {
     }
     
     handleFieldFocus(fieldId) {
-        if (window.socketService) {
+        // Lock field locally first
+        const state = appStore.getState();
+        if (state.user) {
+            storeActions.lockField(fieldId, state.user.id);
+        }
+        
+        // Update via socket if connected
+        if (window.socketService && window.socketService.isConnected()) {
             window.socketService.lockField(fieldId);
         }
     }
     
     handleFieldBlur(fieldId) {
-        if (window.socketService) {
+        // Unlock field locally first
+        const state = appStore.getState();
+        if (state.fieldLocks?.[fieldId] === state.user?.id) {
+            storeActions.unlockField(fieldId);
+        }
+        
+        // Update via socket if connected
+        if (window.socketService && window.socketService.isConnected()) {
             window.socketService.unlockField(fieldId);
         }
     }
@@ -209,7 +223,8 @@ class FormManager {
     handleFieldChange(fieldId, value) {
         storeActions.updateFieldValue(fieldId, value);
         
-        if (window.socketService) {
+        // Update via socket if connected
+        if (window.socketService && window.socketService.isConnected()) {
             window.socketService.updateField(fieldId, value);
         }
     }

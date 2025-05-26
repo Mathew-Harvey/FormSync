@@ -39,6 +39,11 @@ class App {
         const params = getQueryParams();
         
         if (path === '/' || path === '/index.html') {
+            // Check if there's a form parameter in the URL
+            if (params.form) {
+                // Store form ID for after login
+                session.set('pendingFormId', params.form);
+            }
             storeActions.setCurrentPage('landing');
         } else if (path.startsWith('/form/')) {
             const formId = path.split('/')[2];
@@ -123,12 +128,19 @@ window.FormSyncApp = {
     }
 };
 
-// Initialize app when DOM is ready
+// Initialize app and all components when DOM is ready
 let app;
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+        // Initialize core app
         app = new App();
         window.FormSyncApp = app;
+        
+        // Initialize WebRTC manager globally
+        window.webRTCManager = new WebRTCManager();
+        
+        // Initialize video component
+        window.videoComponent = new VideoComponent();
         
         // Handle any pending navigation
         if (window.FormSyncApp._pendingNavigation) {
@@ -139,4 +151,10 @@ if (document.readyState === 'loading') {
 } else {
     app = new App();
     window.FormSyncApp = app;
+    
+    // Initialize WebRTC manager globally
+    window.webRTCManager = new WebRTCManager();
+    
+    // Initialize video component
+    window.videoComponent = new VideoComponent();
 } 

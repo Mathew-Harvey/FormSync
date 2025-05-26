@@ -147,51 +147,48 @@ class LandingPage {
             // Get template data
             const template = CONSTANTS.FORM_TEMPLATES[this.selectedTemplate];
             
-            // Create form on server
+            // Create form data
             const formData = {
                 formId: formCode,
                 templateId: this.selectedTemplate,
                 title: template.title,
                 description: template.description,
                 fields: template.fields,
-                createdBy: user.id
+                createdBy: user.id,
+                formData: {},
+                activeUsers: [],
+                fieldLocks: {},
+                screenshots: []
             };
             
-            try {
-                // Create form via API
-                console.log('Creating form with data:', formData);
-                const response = await API.forms.create(formData);
-                console.log('Form created successfully:', response);
-                
-                // Reset button before navigation
-                createBtn.disabled = false;
-                createBtn.textContent = 'Create Form';
-                
-                // Navigate to form
-                window.FormSyncApp.navigate(`/form/${formCode}`);
-            } catch (apiError) {
-                console.error('API error creating form:', apiError);
-                console.error('Error details:', apiError.message, apiError.stack);
-                
-                // If API fails, store form data temporarily and navigate anyway
-                // This allows the app to work even if the server is down
-                session.set('newForm', {
-                    ...formData,
-                    formData: {},
-                    activeUsers: [],
-                    fieldLocks: {},
-                    screenshots: []
-                });
-                
-                Toast.warning('Creating form offline - server connection issue');
-                
-                // Reset button before navigation
-                createBtn.disabled = false;
-                createBtn.textContent = 'Create Form';
-                
-                // Navigate to form
-                window.FormSyncApp.navigate(`/form/${formCode}`);
+            // Save form to localStorage first
+            if (window.localSyncService) {
+                window.localSyncService.saveForm(formCode, formData);
             }
+            
+            // Store form in session for immediate use
+            session.set('newForm', formData);
+            
+            // Try to create form via API if server is available
+            if (window.socketService && window.socketService.isConnected()) {
+                try {
+                    console.log('Creating form on server:', formData);
+                    const response = await API.forms.create(formData);
+                    console.log('Form created on server:', response);
+                } catch (apiError) {
+                    console.warn('Failed to create form on server, continuing offline:', apiError);
+                    Toast.info('Form created offline - will sync when connection is restored');
+                }
+            } else {
+                Toast.info('Working offline - form saved locally');
+            }
+            
+            // Reset button before navigation
+            createBtn.disabled = false;
+            createBtn.textContent = 'Create Form';
+            
+            // Navigate to form
+            window.FormSyncApp.navigate(`/form/${formCode}`);
         } catch (error) {
             console.error('Error creating form:', error);
             Toast.error('Failed to create form');

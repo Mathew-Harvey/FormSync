@@ -92,7 +92,8 @@ const connectDB = async () => {
     logger.info('MongoDB connected successfully');
   } catch (error) {
     logger.error('MongoDB connection error:', error);
-    process.exit(1);
+    logger.warn('Running without database - data will not persist');
+    // Don't exit, continue without database
   }
 };
 

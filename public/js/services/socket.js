@@ -239,6 +239,11 @@ class SocketService {
         
         console.log('User:', user);
         
+        // Start local sync regardless of server connection
+        if (window.localSyncService) {
+            window.localSyncService.startSync(formId);
+        }
+        
         // Check if this is a new form
         const newForm = session.get('newForm');
         if (newForm && newForm.formId === formId) {
@@ -247,15 +252,37 @@ class SocketService {
             storeActions.setCurrentForm(newForm);
             this.updateFormUI(newForm);
             session.remove('newForm');
+            
+            // Save form to localStorage
+            if (window.localSyncService) {
+                window.localSyncService.saveForm(formId, newForm);
+            }
+            return;
         }
         
-        console.log('Emitting JOIN_FORM event');
-        this.socket.emit(CONSTANTS.SOCKET_EVENTS.JOIN_FORM, {
-            formId,
-            userId: user.id,
-            userName: user.name,
-            userColor: user.color
-        });
+        // Check if form exists in localStorage
+        if (window.localSyncService && window.localSyncService.formExists(formId)) {
+            const localForm = window.localSyncService.loadForm(formId);
+            if (localForm) {
+                console.log('Loading form from localStorage:', localForm);
+                storeActions.setCurrentForm(localForm);
+                this.updateFormUI(localForm);
+            }
+        }
+        
+        // Try to join via socket if connected
+        if (this.connected) {
+            console.log('Emitting JOIN_FORM event');
+            this.socket.emit(CONSTANTS.SOCKET_EVENTS.JOIN_FORM, {
+                formId,
+                userId: user.id,
+                userName: user.name,
+                userColor: user.color
+            });
+        } else {
+            console.log('Socket not connected, using localStorage only');
+            Toast.warning('Working offline - changes will sync when connection is restored');
+        }
     }
     
     lockField(fieldId) {
@@ -440,6 +467,52 @@ class SocketService {
             this.socket = null;
             this.connected = false;
         }
+    }
+    
+    updateUsersList() {
+        const usersList = document.getElementById('usersList');
+        const currentUsers = Object.values(appState.users).filter(u => u.id);
+        
+        usersList.innerHTML = currentUsers.map(user => {
+            const isCurrentUser = user.id === appState.currentUser.id;
+            const activity = this.getUserActivity(user.id);
+            
+            return `
+                <div class="user-item" data-user-id="${user.id}">
+                    <div class="user-status" style="background-color: ${user.color}">
+                        ${user.initials || getUserInitials(user.name)}
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">${user.name}${isCurrentUser ? ' (You)' : ''}</div>
+                        <div class="user-activity">${activity}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        updateUserPresence();
+    }
+    
+    getUserActivity(userId) {
+        const state = appStore.getState();
+        
+        // Check if user is editing any field
+        for (const [fieldId, lockUserId] of Object.entries(state.fieldLocks || {})) {
+            if (lockUserId === userId) {
+                const field = document.querySelector(`[data-field-id="${fieldId}"] label`);
+                if (field) {
+                    const fieldLabel = field.textContent.replace(' *', '').replace('*', '');
+                    return `Editing ${fieldLabel}`;
+                }
+            }
+        }
+        
+        // Check if user is in video call
+        if (state.activeCall && state.activeCall.participants.includes(userId)) {
+            return 'In video call';
+        }
+        
+        return 'Active';
     }
 }
 
