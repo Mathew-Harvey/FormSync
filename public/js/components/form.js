@@ -7,6 +7,28 @@ class FormManager {
     
     init() {
         this.bindEvents();
+        
+        // Subscribe to field lock changes
+        this.unsubscribeFieldLocks = appStore.subscribe((fieldLocks) => {
+            if (window.formManager) {
+                window.formManager.updateFieldLockStates();
+            }
+        }, state => state ? state.fieldLocks : null);
+        
+        // Subscribe to active users changes (for lock indicators)
+        this.unsubscribeUsers = appStore.subscribe((activeUsers) => {
+            if (window.formManager) {
+                window.formManager.updateFieldLockStates();
+            }
+        }, state => state ? state.activeUsers : null);
+        
+        // Subscribe to form data changes (for field value updates)
+        this.unsubscribeFormData = appStore.subscribe((formData) => {
+            console.log('Form data subscription triggered:', formData);
+            if (window.formManager) {
+                window.formManager.updateFieldValues(formData);
+            }
+        }, state => state ? state.formData : null);
     }
     
     bindEvents() {
@@ -33,15 +55,33 @@ class FormManager {
     }
     
     renderFields(fields) {
+        console.log('renderFields called with:', fields);
         const container = document.getElementById('formFields');
-        if (!container) return;
+        if (!container) {
+            console.error('formFields container not found');
+            return;
+        }
         
+        if (!fields || fields.length === 0) {
+            console.log('No fields provided, showing error message');
+            container.innerHTML = '<p class="error-message">No fields available. This form might be empty or failed to load.</p>';
+            return;
+        }
+        
+        console.log('Rendering', fields.length, 'fields');
+        
+        // Clear the container first
         container.innerHTML = '';
         
+        // Append each field element to the container
         fields.forEach(field => {
-            const fieldEl = this.createFieldElement(field);
-            container.appendChild(fieldEl);
+            const fieldElement = this.createFieldElement(field);
+            container.appendChild(fieldElement);
         });
+        
+        // Update field locking states after rendering
+        this.updateFieldLockStates();
+        console.log('Fields rendered successfully');
     }
     
     createFieldElement(field) {
@@ -52,6 +92,13 @@ class FormManager {
         const label = document.createElement('label');
         label.innerHTML = `${field.label} ${field.required ? '<span class="required">*</span>' : ''}`;
         fieldDiv.appendChild(label);
+        
+        // Add lock indicator container
+        const lockIndicator = document.createElement('div');
+        lockIndicator.className = 'field-lock-indicator';
+        lockIndicator.style.display = 'none';
+        lockIndicator.innerHTML = '<span>🔒</span><span class="lock-user"></span>';
+        fieldDiv.appendChild(lockIndicator);
         
         let input;
         
@@ -147,6 +194,112 @@ class FormManager {
         return fieldDiv;
     }
     
+    updateFieldLockStates() {
+        const state = appStore.getState();
+        const fieldLocks = state.fieldLocks || {};
+        const activeUsers = state.activeUsers || [];
+        
+        Object.keys(fieldLocks).forEach(fieldId => {
+            const lockedByUserId = fieldLocks[fieldId];
+            const fieldElement = document.querySelector(`[data-field-id="${fieldId}"]`);
+            
+            if (fieldElement) {
+                const lockIndicator = fieldElement.querySelector('.field-lock-indicator');
+                const input = fieldElement.querySelector('input, select, textarea');
+                
+                if (lockIndicator && input) {
+                    // Find the user who locked the field
+                    const lockedByUser = activeUsers.find(user => user.userId === lockedByUserId);
+                    
+                    if (lockedByUser) {
+                        // Show lock indicator
+                        lockIndicator.style.display = 'flex';
+                        lockIndicator.querySelector('.lock-user').textContent = lockedByUser.name;
+                        
+                        // Add locked class to field
+                        fieldElement.classList.add('locked');
+                        
+                        // Disable input if not locked by current user
+                        if (lockedByUserId !== state.user?.id) {
+                            input.disabled = true;
+                        } else {
+                            input.disabled = false;
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Remove lock indicators for unlocked fields
+        document.querySelectorAll('.form-field').forEach(fieldElement => {
+            const fieldId = fieldElement.dataset.fieldId;
+            if (!fieldLocks[fieldId]) {
+                const lockIndicator = fieldElement.querySelector('.field-lock-indicator');
+                const input = fieldElement.querySelector('input, select, textarea');
+                
+                if (lockIndicator) {
+                    lockIndicator.style.display = 'none';
+                }
+                
+                if (input) {
+                    input.disabled = false;
+                }
+                
+                fieldElement.classList.remove('locked');
+            }
+        });
+    }
+    
+    updateFieldValues(formData) {
+        if (!formData) return;
+        
+        console.log('FormManager.updateFieldValues called with:', formData);
+        
+        Object.entries(formData).forEach(([fieldId, value]) => {
+            console.log(`Updating field ${fieldId} with value:`, value);
+            
+            // Try multiple selectors to find the input
+            let input = document.getElementById(`field-${fieldId}`);
+            console.log(`Trying field-${fieldId}:`, input);
+            if (!input) {
+                input = document.querySelector(`[data-field-id="${fieldId}"] input:not([type="hidden"]), [data-field-id="${fieldId}"] select, [data-field-id="${fieldId}"] textarea`);
+                console.log(`Trying data-field-id="${fieldId}":`, input);
+            }
+            if (!input) {
+                // For checkboxes, they might be nested differently
+                input = document.querySelector(`[data-field-id="${fieldId}"] input[type="checkbox"]`);
+                console.log(`Trying checkbox selector for ${fieldId}:`, input);
+            }
+            if (!input) {
+                console.warn(`Could not find input for field ${fieldId}`);
+                console.log('Available fields:', document.querySelectorAll('.form-field').length);
+                document.querySelectorAll('.form-field').forEach(field => {
+                    console.log('Field:', field.dataset.fieldId, field);
+                });
+                return;
+            }
+            
+            // Don't update if the input is currently focused AND the field is locked by the current user
+            const state = appStore.getState();
+            const isMyField = state.fieldLocks?.[fieldId] === state.user?.id;
+            console.log(`Field ${fieldId} - focused:`, document.activeElement === input, 'isMyField:', isMyField);
+            if (document.activeElement === input && isMyField) {
+                console.log(`Field ${fieldId} is focused and locked by me, skipping update`);
+                return;
+            }
+            
+            console.log(`Updating field ${fieldId}, input type:`, input.type, 'current value:', input.value);
+            
+            if (input.type === 'checkbox') {
+                input.checked = Boolean(value);
+            } else {
+                input.value = value || '';
+            }
+            
+            console.log(`Successfully updated field ${fieldId} with value:`, value, 'new input value:', input.value);
+        });
+    }
+    
     async captureScreenshotForField(fieldId) {
         try {
             // Use the screenshot manager to capture
@@ -195,30 +348,67 @@ class FormManager {
     }
     
     handleFieldFocus(fieldId) {
-        if (window.socketService) {
+        // Lock field locally first
+        const state = appStore.getState();
+        if (state.user) {
+            storeActions.lockField(fieldId, state.user.id);
+            this.updateFieldLockStates();
+        }
+        
+        // Update via socket if connected
+        if (window.socketService && window.socketService.isConnected()) {
             window.socketService.lockField(fieldId);
         }
     }
     
     handleFieldBlur(fieldId) {
-        if (window.socketService) {
+        console.log('handleFieldBlur called for:', fieldId);
+        console.log('Current focused element:', document.activeElement);
+        // Unlock field locally first
+        const state = appStore.getState();
+        if (state.fieldLocks?.[fieldId] === state.user?.id) {
+            storeActions.unlockField(fieldId);
+            this.updateFieldLockStates();
+        }
+        
+        // Update via socket if connected
+        if (window.socketService && window.socketService.isConnected()) {
             window.socketService.unlockField(fieldId);
         }
     }
     
     handleFieldChange(fieldId, value) {
+        console.log('FormManager.handleFieldChange called:', fieldId, value);
         storeActions.updateFieldValue(fieldId, value);
         
-        if (window.socketService) {
+        // Update via socket if connected
+        if (window.socketService && window.socketService.isConnected()) {
+            console.log('Socket connected, sending field update');
             window.socketService.updateField(fieldId, value);
+        } else {
+            console.log('Socket not connected, field update not sent');
         }
     }
     
     copyFormCode() {
         const codeEl = document.getElementById('formCodeDisplay');
-        if (!codeEl) return;
-        
-        const code = codeEl.textContent;
+        let code = codeEl ? codeEl.textContent : '';
+        if (!code) {
+            const state = appStore.getState();
+            code = state.currentForm?.formId || '';
+        }
+        if (!code) {
+            // Check URL params
+            const params = new URLSearchParams(window.location.search);
+            code = params.get('form') || '';
+            console.log('Retrieved formId from URL:', code);
+        }
+        if (!code) {
+            console.error('Form code not found in DOM, state, or URL');
+            Toast.error('No form code available to copy');
+            return;
+        }
+        console.log('Copying form code:', code);
         copyToClipboard(code).then(success => {
             if (success) {
                 Toast.success('Form code copied to clipboard!');
@@ -252,12 +442,24 @@ class FormManager {
 
 // Initialize form manager
 let formManager;
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        formManager = new FormManager();
-        window.formManager = formManager;
-    });
-} else {
+function initializeFormManager() {
+    console.log('Initializing formManager');
     formManager = new FormManager();
     window.formManager = formManager;
+    console.log('formManager initialized and assigned to window');
+    
+    // Check if there's a pending form to render
+    const state = appStore.getState();
+    if (state.currentForm && state.currentForm.fields) {
+        console.log('Found pending form, rendering now');
+        setTimeout(() => {
+            formManager.renderFields(state.currentForm.fields);
+        }, 50);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeFormManager);
+} else {
+    initializeFormManager();
 } 

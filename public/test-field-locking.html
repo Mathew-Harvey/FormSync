@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Locking Test</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div class="page active">
+        <div class="form-container">
+            <div class="form-main">
+                <div class="collaborative-form">
+                    <div class="form-fields" id="formFields">
+                        <!-- Fields will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug panel -->
+    <div style="position: fixed; top: 10px; right: 10px; background: white; padding: 10px; border: 1px solid #ccc; max-width: 300px; z-index: 1000;">
+        <h4>Debug Info</h4>
+        <div id="debugInfo"></div>
+        <button onclick="testFieldUpdate()">Test Field Update</button>
+        <button onclick="testFieldLock()">Test Field Lock</button>
+        <button onclick="testRemoteFieldUpdate()">Test Remote Update</button>
+        <button onclick="testSocketConnection()">Test Socket Connection</button>
+    </div>
+
+    <!-- Load dependencies -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="js/utils/constants.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/utils/toast.js"></script>
+    <script src="js/services/store.js"></script>
+    <script src="js/services/api.js"></script>
+    <script src="js/services/socket.js"></script>
+    <script src="js/components/form.js"></script>
+
+    <script>
+        // Test data
+        const testForm = {
+            formId: 'test-form',
+            title: 'Test Form',
+            description: 'Testing field locking functionality',
+            fields: [
+                { id: 'name', type: 'text', label: 'Full Name', required: true },
+                { id: 'email', type: 'email', label: 'Email Address', required: true },
+                { id: 'message', type: 'textarea', label: 'Message', required: false },
+                { id: 'category', type: 'select', label: 'Category', options: ['General', 'Support', 'Feedback'], required: true },
+                { id: 'subscribe', type: 'checkbox', label: 'Subscribe to newsletter', required: false }
+            ]
+        };
+
+        // Mock user
+        const testUser = {
+            id: 'test-user-1',
+            name: 'Test User',
+            color: '#3b82f6',
+            initials: 'TU'
+        };
+
+        // Debug function
+        function updateDebugInfo() {
+            const state = appStore.getState();
+            const debugEl = document.getElementById('debugInfo');
+            const socketConnected = window.socketService?.connected || false;
+            const socketInstance = window.socketService?.socket?.connected || false;
+            
+            debugEl.innerHTML = `
+                <div><strong>User:</strong> ${state.user?.name || 'None'}</div>
+                <div><strong>Form:</strong> ${state.currentForm?.title || 'None'}</div>
+                <div><strong>Field Locks:</strong> ${JSON.stringify(state.fieldLocks)}</div>
+                <div><strong>Form Data:</strong> ${JSON.stringify(state.formData)}</div>
+                <div><strong>Active Users:</strong> ${state.activeUsers?.length || 0}</div>
+                <div><strong>Form Manager:</strong> ${window.formManager ? 'Available' : 'Not Available'}</div>
+                <div><strong>Socket Service:</strong> ${window.socketService ? 'Available' : 'Not Available'}</div>
+                <div><strong>Socket Connected:</strong> ${socketConnected}</div>
+                <div><strong>Socket Instance:</strong> ${socketInstance}</div>
+                <div><strong>Auth Token:</strong> ${state.user?.token ? 'Present' : 'None'}</div>
+            `;
+        }
+
+        // Test functions
+        function testFieldUpdate() {
+            console.log('Testing field update...');
+            storeActions.updateFieldValue('name', 'John Doe ' + Date.now());
+            updateDebugInfo();
+        }
+
+        function testFieldLock() {
+            console.log('Testing field lock...');
+            storeActions.lockField('name', 'test-user-2');
+            updateDebugInfo();
+        }
+
+        function simulateSocketEvent(eventType, data) {
+            console.log(`Simulating socket event: ${eventType}`, data);
+            
+            // Simulate the socket event by calling the handlers directly
+            if (window.socketService && window.socketService.socket) {
+                // Trigger the event handler
+                window.socketService.socket.emit(eventType, data);
+            } else {
+                // Fallback: directly call the store actions
+                switch (eventType) {
+                    case 'field_updated':
+                        storeActions.updateFieldValue(data.fieldId, data.value);
+                        break;
+                    case 'field_locked':
+                        if (data.success) {
+                            storeActions.lockField(data.fieldId, data.lockedBy);
+                        }
+                        break;
+                    case 'field_unlocked':
+                        storeActions.unlockField(data.fieldId);
+                        break;
+                }
+            }
+        }
+
+        function testRemoteFieldUpdate() {
+            console.log('Testing remote field update...');
+            simulateSocketEvent('field_updated', {
+                fieldId: 'email',
+                value: 'remote@example.com ' + Date.now(),
+                updatedBy: 'test-user-2'
+            });
+        }
+
+        function testSocketConnection() {
+            console.log('Testing socket connection...');
+            if (window.socketService) {
+                console.log('Socket service state:', {
+                    connected: window.socketService.connected,
+                    socket: window.socketService.socket?.connected,
+                    authToken: window.socketService.authToken
+                });
+                
+                if (!window.socketService.connected) {
+                    console.log('Forcing socket reconnection...');
+                    window.socketService.connect();
+                }
+            } else {
+                console.log('Socket service not available');
+            }
+        }
+
+        // Initialize test
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Starting field locking test...');
+            
+            // Set up test state
+            appStore.setState({
+                user: testUser,
+                currentForm: testForm,
+                activeUsers: [
+                    { userId: 'test-user-1', name: 'Test User 1', color: '#3b82f6' },
+                    { userId: 'test-user-2', name: 'Test User 2', color: '#ef4444' }
+                ],
+                fieldLocks: {},
+                formData: {}
+            });
+
+            // Update debug info every second
+            setInterval(updateDebugInfo, 1000);
+
+            // Test field locking
+            setTimeout(() => {
+                console.log('Testing field locking...');
+                
+                // Simulate user 1 locking a field
+                storeActions.lockField('name', 'test-user-1');
+                
+                // Simulate user 2 trying to lock the same field
+                setTimeout(() => {
+                    storeActions.lockField('name', 'test-user-2');
+                }, 1000);
+                
+                // Simulate user 1 unlocking the field
+                setTimeout(() => {
+                    storeActions.unlockField('name');
+                }, 3000);
+                
+            }, 1000);
+
+            // Test field value updates
+            setTimeout(() => {
+                console.log('Testing field value updates...');
+                
+                // Simulate user 2 updating a field
+                storeActions.updateFieldValue('email', 'user2@example.com');
+                
+                setTimeout(() => {
+                    storeActions.updateFieldValue('message', 'This is a test message from user 2');
+                }, 1000);
+                
+            }, 5000);
+        });
+    </script>
+</body>
+</html> 

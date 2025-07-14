@@ -1,12 +1,13 @@
 import express from 'express';
 const router = express.Router();
-
-// Simple in-memory user storage (in production, use a database)
-const users = new Map();
+import User from '../models/User.js';
+import jwt from 'jsonwebtoken';
+import { logger } from '../config/logger.js';
+import mongoose from 'mongoose'; // Added for mongoose connection check
 
 // Login/Register endpoint (simplified - creates user if doesn't exist)
-router.post('/login', (req, res) => {
-    const { name } = req.body;
+router.post('/login', async (req, res) => {
+    const { name, color } = req.body;
     
     if (!name || name.trim().length === 0) {
         return res.status(400).json({ 
@@ -15,31 +16,42 @@ router.post('/login', (req, res) => {
         });
     }
     
-    // Generate user ID
-    const userId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    let user;
+    if (mongoose.connection.readyState !== 1) { // 1 means connected
+        logger.warn('DB not connected, creating in-memory guest user');
+        user = {
+            _id: 'temp-' + Date.now(), // Temporary ID
+            name: name.trim(),
+            color: color || '#000000',
+            isTemporary: true
+        };
+    } else {
+        // Create guest user
+        user = await User.createGuest(name.trim(), color || '#000000'); // Default color if not provided
+    }
     
-    // Create or update user
-    const user = {
-        id: userId,
-        name: name.trim(),
-        createdAt: new Date().toISOString()
-    };
-    
-    users.set(userId, user);
+    // Generate JWT
+    const secret = process.env.JWT_SECRET || 'default-secret-for-dev'; // TODO: Set JWT_SECRET in .env
+    if (!process.env.JWT_SECRET) {
+        logger.warn('JWT_SECRET not set, using default for development');
+    }
+    const token = jwt.sign({ userId: user._id }, secret, { expiresIn: '7d' });
     
     res.json({
         success: true,
         user: {
-            id: user.id,
-            name: user.name
-        }
+            id: user._id.toString(),
+            name: user.name,
+            color: user.color
+        },
+        token
     });
 });
 
 // Get user by ID
-router.get('/user/:userId', (req, res) => {
+router.get('/user/:userId', async (req, res) => {
     const { userId } = req.params;
-    const user = users.get(userId);
+    const user = await User.findById(userId);
     
     if (!user) {
         return res.status(404).json({ 
@@ -51,8 +63,9 @@ router.get('/user/:userId', (req, res) => {
     res.json({
         success: true,
         user: {
-            id: user.id,
-            name: user.name
+            id: user._id.toString(),
+            name: user.name,
+            color: user.color
         }
     });
 });

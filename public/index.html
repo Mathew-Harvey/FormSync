@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="css/animations.css">
     
     <!-- Socket.io from CDN -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 </head>
 <body>
     <!-- Landing Page -->
@@ -49,6 +49,12 @@
                             <!-- Templates will be inserted here -->
                         </div>
                         <button id="createBtn" class="btn btn-primary full-width" disabled>Create Form</button>
+                    </div>
+
+                    <!-- Recent Forms Section -->
+                    <div id="recent-forms" class="hidden">
+                        <h3>Recent Forms</h3>
+                        <div id="forms-list"></div>
                     </div>
                 </div>
             </div>
@@ -122,6 +128,7 @@
     <script src="js/utils/helpers.js"></script>
     <script src="js/utils/toast.js"></script>
     <script src="js/services/store.js"></script>
+    <script src="js/services/localSync.js"></script>
     <script src="js/services/socket.js"></script>
     <script src="js/services/api.js"></script>
     <script src="js/services/webrtc.js"></script>

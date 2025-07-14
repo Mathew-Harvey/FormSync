@@ -161,6 +161,13 @@ class WebRTCManager {
                         console.error(`Connection failed with ${userId}`);
                         Toast.error('Video connection failed. Please check your network.');
                         this.handlePeerDisconnection(userId);
+                        // Retry logic
+                        if (!pc._retryCount) pc._retryCount = 0;
+                        if (pc._retryCount < 3) {
+                            pc._retryCount++;
+                            console.log(`Retrying connection to ${userId} (attempt ${pc._retryCount})`);
+                            setTimeout(() => this.initiateCall(userId), 2000);
+                        }
                         break;
                     case 'disconnected':
                         console.warn(`Disconnected from ${userId}`);

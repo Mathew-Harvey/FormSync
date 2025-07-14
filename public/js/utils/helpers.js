@@ -167,20 +167,29 @@ const session = {
 // Copy to clipboard
 async function copyToClipboard(text) {
     try {
+        console.log('copyToClipboard called with text:', text);
+        console.log('isSecureContext:', window.isSecureContext);
+        console.log('navigator.clipboard available:', !!navigator.clipboard);
         if (navigator.clipboard && window.isSecureContext) {
+            console.log('Using navigator.clipboard');
             await navigator.clipboard.writeText(text);
+            console.log('Clipboard write successful');
             return true;
         } else {
-            // Fallback for older browsers
+            console.log('Using fallback method');
             const textArea = document.createElement('textarea');
             textArea.value = text;
             textArea.style.position = 'fixed';
             textArea.style.left = '-999999px';
             document.body.appendChild(textArea);
+            console.log('Textarea appended to body');
             textArea.focus();
             textArea.select();
+            console.log('Textarea focused and selected');
             const successful = document.execCommand('copy');
+            console.log('execCommand copy result:', successful);
             document.body.removeChild(textArea);
+            console.log('Textarea removed from body');
             return successful;
         }
     } catch (error) {

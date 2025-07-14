@@ -17,6 +17,14 @@ class LandingPage {
             document.getElementById('formCode').value = pendingFormId;
             this.showJoinForm();
         }
+        
+        // Check if authenticated
+        const state = appStore.getState();
+        if (state.isAuthenticated) {
+            document.getElementById('userName').value = state.user.name;
+            document.getElementById('userName').disabled = true;
+            this.renderRecentForms();
+        }
     }
     
     bindEvents() {
@@ -139,7 +147,8 @@ class LandingPage {
         
         try {
             // Create guest user
-            const user = storeActions.createGuestUser(userName);
+            const user = await storeActions.createGuestUser(userName);
+            if (!user) throw new Error('Failed to create user');
             
             // Generate form code
             const formCode = generateFormCode();
@@ -147,51 +156,54 @@ class LandingPage {
             // Get template data
             const template = CONSTANTS.FORM_TEMPLATES[this.selectedTemplate];
             
-            // Create form on server
+            // Create form data
             const formData = {
                 formId: formCode,
                 templateId: this.selectedTemplate,
                 title: template.title,
                 description: template.description,
                 fields: template.fields,
-                createdBy: user.id
+                createdBy: user.id,
+                formData: {},
+                activeUsers: [],
+                fieldLocks: {},
+                screenshots: []
             };
             
-            try {
-                // Create form via API
-                console.log('Creating form with data:', formData);
-                const response = await API.forms.create(formData);
-                console.log('Form created successfully:', response);
-                
-                // Reset button before navigation
-                createBtn.disabled = false;
-                createBtn.textContent = 'Create Form';
-                
-                // Navigate to form
-                window.FormSyncApp.navigate(`/form/${formCode}`);
-            } catch (apiError) {
-                console.error('API error creating form:', apiError);
-                console.error('Error details:', apiError.message, apiError.stack);
-                
-                // If API fails, store form data temporarily and navigate anyway
-                // This allows the app to work even if the server is down
-                session.set('newForm', {
-                    ...formData,
-                    formData: {},
-                    activeUsers: [],
-                    fieldLocks: {},
-                    screenshots: []
-                });
-                
-                Toast.warning('Creating form offline - server connection issue');
-                
-                // Reset button before navigation
-                createBtn.disabled = false;
-                createBtn.textContent = 'Create Form';
-                
-                // Navigate to form
-                window.FormSyncApp.navigate(`/form/${formCode}`);
+            // Save form to localStorage first
+            if (window.localSyncService) {
+                window.localSyncService.saveForm(formCode, formData);
             }
+            
+            // Immediately set in store
+            storeActions.setCurrentForm(formData);
+            console.log('Form set in state after creation:', formData);
+            
+            // Try to create form via API
+            try {
+                console.log('Creating form on server:', formData);
+                const response = await API.forms.create(formData);
+                console.log('Form created on server:', response);
+                // Update local data if needed
+                Object.assign(formData, response.data);
+                // Resave to local
+                if (window.localSyncService) {
+                    window.localSyncService.saveForm(formCode, formData);
+                }
+                session.set('newForm', formData);
+                storeActions.setCurrentForm(formData);
+            } catch (apiError) {
+                console.warn('Failed to create form on server, continuing offline:', apiError);
+                Toast.info('Form created offline - will sync when connection is restored');
+            }
+            
+            // Reset button before navigation
+            createBtn.disabled = false;
+            createBtn.textContent = 'Create Form';
+            
+            // Navigate to form
+            console.log('Navigating to form:', formCode);
+            window.FormSyncApp.navigate(`/form/${formCode}`);
         } catch (error) {
             console.error('Error creating form:', error);
             Toast.error('Failed to create form');
@@ -200,7 +212,7 @@ class LandingPage {
         }
     }
     
-    handleJoinForm() {
+    async handleJoinForm() {
         if (!this.validateName()) return;
         
         const formCode = document.getElementById('formCode').value.trim().toUpperCase();
@@ -220,11 +232,84 @@ class LandingPage {
         joinBtn.disabled = true;
         joinBtn.textContent = 'Joining...';
         
-        // Create guest user
-        storeActions.createGuestUser(userName);
-        
-        // Navigate to form
-        window.FormSyncApp.navigate(`/form/${formCode}`);
+        try {
+            // Create guest user
+            const user = await storeActions.createGuestUser(userName);
+            if (!user) return;
+            
+            // Navigate to form
+            window.FormSyncApp.navigate(`/form/${formCode}`);
+        } catch (error) {
+            console.error('Error joining form:', error);
+            Toast.error('Failed to join form');
+        } finally {
+            joinBtn.disabled = false;
+            joinBtn.textContent = 'Join Form';
+        }
+    }
+
+    async renderRecentForms() {
+        const list = document.getElementById('forms-list');
+        if (!list) return;
+
+        list.innerHTML = '';
+
+        const forms = new Map();
+
+        // Get local forms
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('formsync_form_')) {
+                const formId = key.replace('formsync_form_', '');
+                const formData = JSON.parse(localStorage.getItem(key));
+                forms.set(formId, {
+                    formId,
+                    title: formData.title,
+                    description: formData.description,
+                    lastActivity: new Date(formData.lastSaved)
+                });
+            }
+        }
+
+        // Get from server if connected
+        if (window.socketService && window.socketService.isConnected()) {
+            try {
+                const response = await API.forms.getUserForms();
+                if (response.success && response.data) {
+                    response.data.forEach(form => {
+                        forms.set(form.formId, {
+                            formId: form.formId,
+                            title: form.title,
+                            description: form.description,
+                            lastActivity: new Date(form.lastActivity)
+                        });
+                    });
+                }
+            } catch (error) {
+                console.warn('Failed to fetch forms from server:', error);
+            }
+        }
+
+        if (forms.size === 0) return;
+
+        // Sort by lastActivity desc
+        const sortedForms = Array.from(forms.values()).sort((a, b) => b.lastActivity - a.lastActivity);
+
+        sortedForms.forEach(form => {
+            const item = document.createElement('div');
+            item.className = 'form-item';
+            item.innerHTML = `
+                <h4>${form.title}</h4>
+                <p>${form.description}</p>
+                <small>Code: ${form.formId} - Last active: ${form.lastActivity.toLocaleString()}</small>
+            `;
+            item.addEventListener('click', () => {
+                window.FormSyncApp.navigate(`/form/${form.formId}`);
+            });
+            list.appendChild(item);
+        });
+
+        document.getElementById('recent-forms').classList.remove('hidden');
     }
 }
 

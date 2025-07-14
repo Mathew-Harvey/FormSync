@@ -4,6 +4,9 @@ const API = {
     baseURL: CONSTANTS.API_BASE_URL,
     
     async request(endpoint, options = {}) {
+        const state = appStore.getState();
+        const token = state.user?.token;
+        
         const url = `${this.baseURL}${endpoint}`;
         const config = {
             ...options,
@@ -12,6 +15,10 @@ const API = {
                 ...options.headers
             }
         };
+        
+        if (token) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
         
         try {
             const response = await fetch(url, config);
@@ -55,6 +62,10 @@ const API = {
         
         getTemplates() {
             return API.request('/api/forms/templates');
+        },
+
+        getUserForms() {
+            return API.request('/api/forms/user');
         }
     },
     
@@ -74,17 +85,10 @@ const API = {
     
     // Auth endpoints
     auth: {
-        login(email, password) {
+        login(name, color) {
             return API.request('/api/auth/login', {
                 method: 'POST',
-                body: JSON.stringify({ email, password })
-            });
-        },
-        
-        register(data) {
-            return API.request('/api/auth/register', {
-                method: 'POST',
-                body: JSON.stringify(data)
+                body: JSON.stringify({ name, color })
             });
         },
         

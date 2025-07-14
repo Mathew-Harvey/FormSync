@@ -12,6 +12,7 @@ export const handleSocketConnection = (io, socket) => {
   socket.on(SOCKET_EVENTS.JOIN_FORM, async (data) => {
     try {
       const { formId, userId, userName, userColor } = data;
+      logger.info(`JOIN_FORM received: formId=${formId}, userId=${userId}, userName=${userName}`);
       
       // Store connection info
       activeConnections.set(socket.id, {
@@ -19,19 +20,24 @@ export const handleSocketConnection = (io, socket) => {
         formId,
         user: { userId, name: userName, color: userColor }
       });
+      logger.info(`Connection stored for socket ${socket.id}`);
 
       // Join socket room
       socket.join(formId);
+      logger.info(`Socket ${socket.id} joined room ${formId}`);
 
       // Get or create form
       let form = await Form.findByFormId(formId);
       if (!form) {
+        logger.warn(`Form not found: ${formId}`);
         socket.emit(SOCKET_EVENTS.FORM_ERROR, { message: 'Form not found' });
         return;
       }
+      logger.info(`Form found: ${formId}`);
 
       // Add user to form
       await form.addUser({ userId, name: userName, color: userColor });
+      logger.info(`User ${userId} added to form ${formId}`);
 
       // Send form data to user
       socket.emit(SOCKET_EVENTS.FORM_JOINED, {
@@ -47,16 +53,19 @@ export const handleSocketConnection = (io, socket) => {
           activeCall: form.activeCall
         }
       });
+      logger.info(`FORM_JOINED event sent to user ${userId}`);
 
       // Notify other users
       socket.to(formId).emit(SOCKET_EVENTS.USER_JOINED, {
         user: { userId, name: userName, color: userColor }
       });
+      logger.info(`USER_JOINED event sent to other users in form ${formId}`);
 
       // Send updated users list to all
       io.to(formId).emit(SOCKET_EVENTS.USERS_UPDATE, {
         users: form.activeUsers
       });
+      logger.info(`USERS_UPDATE event sent to all users in form ${formId}`);
 
       logger.info(`User ${userName} joined form ${formId}`);
     } catch (error) {
@@ -130,15 +139,26 @@ export const handleSocketConnection = (io, socket) => {
   socket.on(SOCKET_EVENTS.FIELD_UPDATE, async (data) => {
     try {
       const { fieldId, value } = data;
+      logger.info(`FIELD_UPDATE received: fieldId=${fieldId}, value=${value}`);
+      
       const connection = activeConnections.get(socket.id);
-      if (!connection) return;
+      if (!connection) {
+        logger.warn('No connection found for socket:', socket.id);
+        return;
+      }
 
       const { formId, userId } = connection;
+      logger.info(`Processing field update for form ${formId} by user ${userId}`);
+      
       const form = await Form.findByFormId(formId);
-      if (!form) return;
+      if (!form) {
+        logger.warn('Form not found:', formId);
+        return;
+      }
 
       // Update field value
       await form.updateFieldValue(fieldId, value);
+      logger.info(`Field ${fieldId} updated in database`);
 
       // Notify other users
       socket.to(formId).emit(SOCKET_EVENTS.FIELD_UPDATED, {
@@ -146,6 +166,7 @@ export const handleSocketConnection = (io, socket) => {
         value,
         updatedBy: userId
       });
+      logger.info(`FIELD_UPDATED event emitted to form ${formId}`);
     } catch (error) {
       logger.error('Error updating field:', error);
     }

@@ -4,17 +4,43 @@ class SocketService {
     constructor() {
         this.socket = null;
         this.connected = false;
+        this.authToken = null;
+        this.pendingFormId = null;
+        console.log('SocketService constructor called');
         this.init();
     }
     
     init() {
-        this.connect();
-        this.setupEventListeners();
+        console.log('SocketService.init() called');
+        // Subscribe to user changes for token
+        appStore.subscribe((user) => {
+            console.log('User subscription triggered:', user);
+            if (user && user.token) {
+                if (user.token !== this.authToken) {
+                    console.log('New user token, connecting socket');
+                    this.authToken = user.token;
+                    // Disconnect existing connection if any
+                    if (this.socket) {
+                        this.disconnect();
+                    }
+                    // Connect with new token
+                    this.connect();
+                }
+            } else {
+                // No user or no token - disconnect if connected
+                if (this.connected) {
+                    console.log('No user token, disconnecting socket');
+                    this.disconnect();
+                }
+            }
+        }, state => state.user);
     }
     
     connect() {
         const serverUrl = CONSTANTS.API_BASE_URL;
         
+        console.log('SocketService.connect() called');
+        console.log('Auth token:', this.authToken ? 'Present' : 'Missing');
         console.log('Attempting to connect to:', serverUrl);
         
         this.socket = io(serverUrl, {
@@ -22,53 +48,149 @@ class SocketService {
             autoConnect: true,
             reconnection: true,
             reconnectionAttempts: 5,
-            reconnectionDelay: 1000
+            reconnectionDelay: 1000,
+            auth: { token: this.authToken }
         });
+        
+        // Setup event listeners after socket is created
+        this.setupEventListeners();
         
         this.socket.on('connect', () => {
             this.connected = true;
             console.log('Connected to server with socket ID:', this.socket.id);
+            console.log('Socket connection established successfully');
             Toast.success('Connected to server');
+            
+            // Handle pending form join
+            if (this.pendingFormId) {
+                console.log('Handling pending form join for:', this.pendingFormId);
+                const state = appStore.getState();
+                const user = state.user;
+                
+                if (user) {
+                    console.log('Joining pending form via socket');
+                    this.socket.emit(CONSTANTS.SOCKET_EVENTS.JOIN_FORM, {
+                        formId: this.pendingFormId,
+                        userId: user.id,
+                        userName: user.name,
+                        userColor: user.color
+                    });
+                }
+                this.pendingFormId = null;
+            }
         });
         
         this.socket.on('disconnect', (reason) => {
             this.connected = false;
             console.log('Disconnected from server. Reason:', reason);
-            Toast.error('Connection lost. Trying to reconnect...');
+            
+            // Only show error if we were previously connected (not during initial connection)
+            if (reason !== 'io client disconnect' && reason !== 'io server disconnect') {
+                Toast.error('Connection lost. Trying to reconnect...');
+            }
         });
         
         this.socket.on('connect_error', (error) => {
             console.error('Connection error:', error.message);
             console.error('Error type:', error.type);
-            Toast.error(`Connection failed: ${error.message}`);
+            
+            // Only show error if we have a token (user is authenticated)
+            if (this.authToken) {
+                Toast.error(`Connection failed: ${error.message}`);
+            } else {
+                console.log('Connection error during initialization (no auth token yet)');
+            }
         });
         
         this.socket.on('error', (error) => {
             console.error('Socket error:', error);
-            Toast.error('Connection error');
+            
+            // Only show error if we have a token (user is authenticated)
+            if (this.authToken) {
+                Toast.error('Connection error');
+            }
         });
     }
     
     setupEventListeners() {
+        // Ensure socket exists before setting up listeners
+        if (!this.socket) {
+            console.warn('Socket not available, skipping event listener setup');
+            return;
+        }
+        
         // Form events
         this.socket.on(CONSTANTS.SOCKET_EVENTS.FORM_JOINED, (data) => {
             console.log('FORM_JOINED event received:', data);
+            console.log('Form data:', data.form);
+
+            const state = appStore.getState();
+            const localFormData = { ...state.formData };
+
             storeActions.setCurrentForm(data.form);
+
+            // Merge local form data changes
+            Object.entries(localFormData).forEach(([fieldId, value]) => {
+                const currentValue = appStore.getState().formData[fieldId];
+                if (currentValue !== value) {
+                    console.log(`Merging local change for ${fieldId}: ${value}`);
+                    storeActions.updateFieldValue(fieldId, value);
+                    this.updateField(fieldId, value);
+                }
+            });
+
             Toast.success('Joined form successfully');
-            
+
+            // Clear pending form ID
+            this.pendingFormId = null;
+
             // Update UI
             this.updateFormUI(data.form);
         });
         
-        this.socket.on(CONSTANTS.SOCKET_EVENTS.FORM_ERROR, (data) => {
+        this.socket.on(CONSTANTS.SOCKET_EVENTS.FORM_ERROR, async (data) => {
             console.error('Form error received:', data);
-            Toast.error(data.message || 'Form error occurred');
-            storeActions.setError(data.message);
             
             // Show more specific error message
             if (data.message && data.message.includes('not found')) {
+                console.log('Form not found, attempting to create it on server');
+                
+                // Try to create the form on the server if we have local data
+                if (window.localSyncService && this.pendingFormId) {
+                    const localForm = window.localSyncService.loadForm(this.pendingFormId);
+                    if (localForm) {
+                        try {
+                            console.log('Creating form on server:', localForm);
+                            const response = await API.forms.create(localForm);
+                            console.log('Form created on server:', response);
+                            
+                            // Try joining again
+                            if (this.pendingFormId) {
+                                const state = appStore.getState();
+                                const user = state.user;
+                                if (user) {
+                                    console.log('Retrying form join after creation');
+                                    this.socket.emit(CONSTANTS.SOCKET_EVENTS.JOIN_FORM, {
+                                        formId: this.pendingFormId,
+                                        userId: user.id,
+                                        userName: user.name,
+                                        userColor: user.color
+                                    });
+                                    return;
+                                }
+                            }
+                        } catch (createError) {
+                            console.error('Failed to create form on server:', createError);
+                        }
+                    }
+                }
+                
                 Toast.error('Form not found. It may have been deleted or the code is incorrect.');
+            } else {
+                Toast.error(data.message || 'Form error occurred');
             }
+            
+            storeActions.setError(data.message);
             
             // Navigate back to landing
             setTimeout(() => {
@@ -78,6 +200,7 @@ class SocketService {
         
         // User events
         this.socket.on(CONSTANTS.SOCKET_EVENTS.USER_JOINED, (data) => {
+            console.log('USER_JOINED event received:', data);
             storeActions.addUser(data.user);
             Toast.info(`${data.user.name} joined the form`);
         });
@@ -93,28 +216,41 @@ class SocketService {
         });
         
         this.socket.on(CONSTANTS.SOCKET_EVENTS.USERS_UPDATE, (data) => {
+            console.log('USERS_UPDATE event received:', data);
             storeActions.updateUsers(data.users);
             this.updateActiveUsersUI(data.users);
         });
         
         // Field events
         this.socket.on(CONSTANTS.SOCKET_EVENTS.FIELD_LOCKED, (data) => {
+            console.log('FIELD_LOCKED event received:', data);
             if (data.success) {
                 storeActions.lockField(data.fieldId, data.lockedBy);
-                this.updateFieldLockUI(data.fieldId, data.lockedBy);
+                if (window.formManager) {
+                    window.formManager.updateFieldLockStates();
+                }
             }
         });
         
         this.socket.on(CONSTANTS.SOCKET_EVENTS.FIELD_UNLOCKED, (data) => {
+            console.log('FIELD_UNLOCKED event received:', data);
             storeActions.unlockField(data.fieldId);
-            this.updateFieldLockUI(data.fieldId, null);
+            if (window.formManager) {
+                window.formManager.updateFieldLockStates();
+            }
         });
         
         this.socket.on(CONSTANTS.SOCKET_EVENTS.FIELD_UPDATED, (data) => {
+            console.log('FIELD_UPDATED event received:', data);
             const state = appStore.getState();
+            console.log('Current user ID:', state.user?.id, 'Updated by:', data.updatedBy);
+            console.log('User ID comparison:', data.updatedBy !== state.user?.id);
             if (data.updatedBy !== state.user?.id) {
+                console.log('Updating field value from external source:', data.fieldId, data.value);
                 storeActions.updateFieldValue(data.fieldId, data.value);
                 this.updateFieldValueUI(data.fieldId, data.value);
+            } else {
+                console.log('Ignoring own field update');
             }
         });
         
@@ -231,13 +367,24 @@ class SocketService {
         console.log('joinForm called with formId:', formId);
         const state = appStore.getState();
         const user = state.user;
+        console.log('Current user:', user);
         
         if (!user) {
+            console.log('No user found, showing error');
             Toast.error('Please login first');
             return;
         }
         
-        console.log('User:', user);
+        console.log('User found:', user);
+        console.log('Socket connection state:', this.connected, this.socket?.connected);
+        
+        // Start local sync regardless of server connection
+        if (window.localSyncService) {
+            console.log('Starting local sync for form:', formId);
+            window.localSyncService.startSync(formId);
+        } else {
+            console.log('localSyncService not available');
+        }
         
         // Check if this is a new form
         const newForm = session.get('newForm');
@@ -247,27 +394,89 @@ class SocketService {
             storeActions.setCurrentForm(newForm);
             this.updateFormUI(newForm);
             session.remove('newForm');
+            
+            // Save form to localStorage
+            if (window.localSyncService) {
+                window.localSyncService.saveForm(formId, newForm);
+            }
+            return;
         }
         
-        console.log('Emitting JOIN_FORM event');
-        this.socket.emit(CONSTANTS.SOCKET_EVENTS.JOIN_FORM, {
-            formId,
-            userId: user.id,
-            userName: user.name,
-            userColor: user.color
-        });
+        // Check if form exists in localStorage
+        let loadedFromLocal = false;
+        if (window.localSyncService && window.localSyncService.formExists(formId)) {
+            const localForm = window.localSyncService.loadForm(formId);
+            if (localForm) {
+                console.log('Loading form from localStorage:', localForm);
+                storeActions.setCurrentForm(localForm);
+                this.updateFormUI(localForm);
+                loadedFromLocal = true;
+            }
+        }
+        
+        // Try to join via socket if connected
+        if (this.connected && this.socket && this.socket.connected) {
+            console.log('Socket connected, emitting JOIN_FORM event');
+            const joinData = {
+                formId,
+                userId: user.id,
+                userName: user.name,
+                userColor: user.color
+            };
+            console.log('Join data:', joinData);
+            this.socket.emit(CONSTANTS.SOCKET_EVENTS.JOIN_FORM, joinData);
+        } else {
+            console.log('Socket not connected, connection state:', {
+                connected: this.connected,
+                socket: !!this.socket,
+                socketConnected: this.socket?.connected
+            });
+            
+            console.log('Socket not connected, storing pending form join');
+            this.pendingFormId = formId;
+            
+            if (!loadedFromLocal) {
+                Toast.info('Waiting for connection to load the form...');
+            } else {
+                Toast.warning('Working offline - changes will sync when connection is restored');
+            }
+            
+            // Try to connect if not already connecting
+            if (!this.socket || !this.socket.connected) {
+                console.log('Attempting to connect socket for form join');
+                this.connect();
+            }
+        }
     }
     
     lockField(fieldId) {
+        if (!this.connected || !this.socket || !this.socket.connected) {
+            console.warn('Socket not connected, cannot lock field:', fieldId);
+            return;
+        }
+        console.log('Emitting FIELD_LOCK for field:', fieldId);
         this.socket.emit(CONSTANTS.SOCKET_EVENTS.FIELD_LOCK, { fieldId });
     }
     
     unlockField(fieldId) {
+        if (!this.connected || !this.socket || !this.socket.connected) {
+            console.warn('Socket not connected, cannot unlock field:', fieldId);
+            return;
+        }
+        console.log('Emitting FIELD_UNLOCK for field:', fieldId);
         this.socket.emit(CONSTANTS.SOCKET_EVENTS.FIELD_UNLOCK, { fieldId });
     }
     
     updateField(fieldId, value) {
-        this.socket.emit(CONSTANTS.SOCKET_EVENTS.FIELD_UPDATE, { fieldId, value });
+        if (!this.connected || !this.socket || !this.socket.connected) {
+            console.warn('Socket not connected, cannot update field:', fieldId);
+            return;
+        }
+        console.log('Emitting FIELD_UPDATE for field:', fieldId, 'value:', value);
+        console.log('Socket connection state:', this.connected, this.socket?.connected);
+        const updateData = { fieldId, value };
+        console.log('Field update data:', updateData);
+        this.socket.emit(CONSTANTS.SOCKET_EVENTS.FIELD_UPDATE, updateData);
     }
     
     sendWebRTCOffer(targetUserId, offer) {
@@ -288,6 +497,8 @@ class SocketService {
     
     // UI update methods
     updateFormUI(form) {
+        console.log('updateFormUI called with form:', form);
+        
         // Update form title and description
         const titleEl = document.getElementById('formTitle');
         const descEl = document.getElementById('formDescription');
@@ -299,7 +510,10 @@ class SocketService {
         
         // Render form fields
         if (window.formManager) {
+            console.log('Calling formManager.renderFields from updateFormUI');
             window.formManager.renderFields(form.fields);
+        } else {
+            console.log('formManager not available in updateFormUI');
         }
         
         // Update active users
@@ -332,8 +546,12 @@ class SocketService {
                         storeActions.unlockField(fieldId);
                         return; // do not apply
                     }
-                    this.updateFieldLockUI(fieldId, userId);
                 });
+                
+                // Update all field lock states using form manager
+                if (window.formManager) {
+                    window.formManager.updateFieldLockStates();
+                }
             }
         });
         
@@ -420,14 +638,47 @@ class SocketService {
     }
     
     updateFieldValueUI(fieldId, value) {
-        const input = document.querySelector(`[data-field-id="${fieldId}"] input, [data-field-id="${fieldId}"] select, [data-field-id="${fieldId}"] textarea`);
-        if (!input) return;
+        console.log(`updateFieldValueUI called for field ${fieldId} with value:`, value);
+        
+        // Try multiple selectors to find the input
+        let input = document.getElementById(`field-${fieldId}`);
+        console.log(`Trying field-${fieldId}:`, input);
+        
+        if (!input) {
+            input = document.querySelector(`[data-field-id="${fieldId}"] input:not([type="hidden"]), [data-field-id="${fieldId}"] select, [data-field-id="${fieldId}"] textarea`);
+            console.log(`Trying data-field-id="${fieldId}":`, input);
+        }
+        if (!input) {
+            // For checkboxes, they might be nested differently
+            input = document.querySelector(`[data-field-id="${fieldId}"] input[type="checkbox"]`);
+            console.log(`Trying checkbox selector for ${fieldId}:`, input);
+        }
+        if (!input) {
+            console.warn(`Could not find input for field ${fieldId}`);
+            console.log('Available fields:', document.querySelectorAll('.form-field').length);
+            document.querySelectorAll('.form-field').forEach(field => {
+                console.log('Field:', field.dataset.fieldId, field);
+            });
+            return;
+        }
+        
+        // Don't update if the input is currently focused AND the field is locked by the current user
+        const state = appStore.getState();
+        const isMyField = state.fieldLocks?.[fieldId] === state.user?.id;
+        if (document.activeElement === input && isMyField) {
+            console.log(`Field ${fieldId} is focused and locked by me, skipping update`);
+            return;
+        }
+        
+        console.log(`Updating field ${fieldId}, input type:`, input.type, 'current value:', input.value);
         
         if (input.type === 'checkbox') {
-            input.checked = value;
+            input.checked = Boolean(value);
         } else {
-            input.value = value;
+            input.value = value || '';
         }
+        
+        console.log(`Successfully updated field ${fieldId} with value:`, value, 'new input value:', input.value);
     }
     
     isConnected() {
@@ -435,11 +686,58 @@ class SocketService {
     }
     
     disconnect() {
+        console.log('SocketService.disconnect() called');
         if (this.socket) {
             this.socket.disconnect();
             this.socket = null;
             this.connected = false;
         }
+    }
+    
+    updateUsersList() {
+        const usersList = document.getElementById('usersList');
+        const currentUsers = Object.values(appState.users).filter(u => u.id);
+        
+        usersList.innerHTML = currentUsers.map(user => {
+            const isCurrentUser = user.id === appState.currentUser.id;
+            const activity = this.getUserActivity(user.id);
+            
+            return `
+                <div class="user-item" data-user-id="${user.id}">
+                    <div class="user-status" style="background-color: ${user.color}">
+                        ${user.initials || getUserInitials(user.name)}
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">${user.name}${isCurrentUser ? ' (You)' : ''}</div>
+                        <div class="user-activity">${activity}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        updateUserPresence();
+    }
+    
+    getUserActivity(userId) {
+        const state = appStore.getState();
+        
+        // Check if user is editing any field
+        for (const [fieldId, lockUserId] of Object.entries(state.fieldLocks || {})) {
+            if (lockUserId === userId) {
+                const field = document.querySelector(`[data-field-id="${fieldId}"] label`);
+                if (field) {
+                    const fieldLabel = field.textContent.replace(' *', '').replace('*', '');
+                    return `Editing ${fieldLabel}`;
+                }
+            }
+        }
+        
+        // Check if user is in video call
+        if (state.activeCall && state.activeCall.participants.includes(userId)) {
+            return 'In video call';
+        }
+        
+        return 'Active';
     }
 }
 
@@ -447,10 +745,14 @@ class SocketService {
 let socketService;
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, initializing socketService');
         socketService = new SocketService();
         window.socketService = socketService;
+        console.log('socketService initialized and assigned to window');
     });
 } else {
+    console.log('DOM already loaded, initializing socketService immediately');
     socketService = new SocketService();
     window.socketService = socketService;
+    console.log('socketService initialized and assigned to window');
 } 

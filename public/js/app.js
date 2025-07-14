@@ -39,6 +39,11 @@ class App {
         const params = getQueryParams();
         
         if (path === '/' || path === '/index.html') {
+            // Check if there's a form parameter in the URL
+            if (params.form) {
+                // Store form ID for after login
+                session.set('pendingFormId', params.form);
+            }
             storeActions.setCurrentPage('landing');
         } else if (path.startsWith('/form/')) {
             const formId = path.split('/')[2];
@@ -91,10 +96,12 @@ class App {
     }
     
     async loadForm(formId) {
+        console.log('loadForm called with formId:', formId);
         const state = appStore.getState();
         
         // Check if user is authenticated
         if (!state.user) {
+            console.log('User not authenticated, storing pending form ID');
             // Store form ID for after login
             session.set('pendingFormId', formId);
             Toast.warning('Please enter your name to join the form');
@@ -102,14 +109,33 @@ class App {
             return;
         }
         
+        console.log('User authenticated, navigating to form page');
         // Navigate to form page
         storeActions.setCurrentPage('form');
         
         // Join form via socket
         if (window.socketService && window.socketService.isConnected()) {
+            console.log('Socket connected, joining form via socket');
             window.socketService.joinForm(formId);
         } else {
-            Toast.error('Connection error. Please refresh the page.');
+            console.log('Socket not connected, attempting to load form from localStorage');
+            if (window.localSyncService) {
+                const localForm = window.localSyncService.loadForm(formId);
+                if (localForm) {
+                    console.log('Found form in localStorage, setting current form:', localForm);
+                    storeActions.setCurrentForm(localForm);
+                } else {
+                    console.log('Form not found in localStorage');
+                    Toast.error('Form not found locally. Please check connection.');
+                }
+            } else {
+                console.log('localSyncService not available');
+                Toast.error('Connection error. Please refresh the page.');
+            }
+            // Set pending form join
+            if (window.socketService) {
+                window.socketService.pendingFormId = formId;
+            }
         }
     }
 }
@@ -123,12 +149,19 @@ window.FormSyncApp = {
     }
 };
 
-// Initialize app when DOM is ready
+// Initialize app and all components when DOM is ready
 let app;
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+        // Initialize core app
         app = new App();
         window.FormSyncApp = app;
+        
+        // Initialize WebRTC manager globally
+        window.webRTCManager = new WebRTCManager();
+        
+        // Initialize video component
+        window.videoComponent = new VideoComponent();
         
         // Handle any pending navigation
         if (window.FormSyncApp._pendingNavigation) {
@@ -139,4 +172,10 @@ if (document.readyState === 'loading') {
 } else {
     app = new App();
     window.FormSyncApp = app;
+    
+    // Initialize WebRTC manager globally
+    window.webRTCManager = new WebRTCManager();
+    
+    // Initialize video component
+    window.videoComponent = new VideoComponent();
 } 

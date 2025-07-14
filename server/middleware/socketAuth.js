@@ -11,7 +11,11 @@ export const socketAuth = (socket, next) => {
     if (token) {
       // Verify JWT token if provided
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const secret = process.env.JWT_SECRET || 'default-secret-for-dev';
+        if (!process.env.JWT_SECRET) {
+          logger.warn('Using default JWT secret for development');
+        }
+        const decoded = jwt.verify(token, secret);
         socket.userId = decoded.userId;
         socket.authenticated = true;
       } catch (error) {

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormSync Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .status.success { background-color: #d4edda; color: #155724; }
+        .status.error { background-color: #f8d7da; color: #721c24; }
+        .status.warning { background-color: #fff3cd; color: #856404; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>FormSync Debug Page</h1>
+    
+    <div class="debug-section">
+        <h2>Connection Status</h2>
+        <div id="connectionStatus" class="status">Checking...</div>
+        <button onclick="testConnection()">Test Connection</button>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Services Status</h2>
+        <div id="servicesStatus" class="status">Checking...</div>
+        <button onclick="checkServices()">Check Services</button>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Form Rendering Test</h2>
+        <div id="formTestStatus" class="status">Ready to test</div>
+        <button onclick="testFormRendering()">Test Form Rendering</button>
+        <div id="testFormContainer"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Store State</h2>
+        <div id="storeState" class="status">Click to check</div>
+        <button onclick="checkStoreState()">Check Store State</button>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Console Logs</h2>
+        <div id="consoleLogs"></div>
+        <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script src="js/utils/constants.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/utils/toast.js"></script>
+    <script src="js/services/store.js"></script>
+    <script src="js/services/localSync.js"></script>
+    <script src="js/services/socket.js"></script>
+    <script src="js/services/api.js"></script>
+    <script src="js/components/form.js"></script>
+    
+    <script>
+        // Capture console logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function addLog(level, ...args) {
+            const logsDiv = document.getElementById('consoleLogs');
+            const logEntry = document.createElement('div');
+            logEntry.style.margin = '5px 0';
+            logEntry.style.padding = '5px';
+            logEntry.style.backgroundColor = level === 'error' ? '#f8d7da' : level === 'warn' ? '#fff3cd' : '#f8f9fa';
+            logEntry.innerHTML = `<strong>${level.toUpperCase()}:</strong> ${args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' ')}`;
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        console.log = (...args) => {
+            originalLog.apply(console, args);
+            addLog('log', ...args);
+        };
+        
+        console.error = (...args) => {
+            originalError.apply(console, args);
+            addLog('error', ...args);
+        };
+        
+        console.warn = (...args) => {
+            originalWarn.apply(console, args);
+            addLog('warn', ...args);
+        };
+        
+        function clearLogs() {
+            document.getElementById('consoleLogs').innerHTML = '';
+        }
+        
+        function updateStatus(elementId, message, type = 'success') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+        }
+        
+        async function testConnection() {
+            updateStatus('connectionStatus', 'Testing connection...', 'warning');
+            
+            try {
+                const response = await fetch(`${CONSTANTS.API_BASE_URL}/health`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('connectionStatus', `✅ Server connected: ${data.status}`, 'success');
+                } else {
+                    updateStatus('connectionStatus', `❌ Server error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                updateStatus('connectionStatus', `❌ Connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function checkServices() {
+            const services = {
+                'appStore': !!window.appStore,
+                'socketService': !!window.socketService,
+                'formManager': !!window.formManager,
+                'localSyncService': !!window.localSyncService
+            };
+            
+            const status = Object.entries(services).map(([name, available]) => 
+                `${available ? '✅' : '❌'} ${name}`
+            ).join('<br>');
+            
+            updateStatus('servicesStatus', status, Object.values(services).every(Boolean) ? 'success' : 'error');
+        }
+        
+        function testFormRendering() {
+            updateStatus('formTestStatus', 'Testing form rendering...', 'warning');
+            
+            const testForm = {
+                formId: 'TEST123',
+                title: 'Test Form',
+                description: 'This is a test form for debugging',
+                fields: [
+                    { id: 'name', type: 'text', label: 'Name', required: true },
+                    { id: 'email', type: 'email', label: 'Email', required: true },
+                    { id: 'message', type: 'textarea', label: 'Message', required: false }
+                ],
+                formData: {},
+                activeUsers: [],
+                fieldLocks: {},
+                screenshots: []
+            };
+            
+            try {
+                // Set the form in the store
+                storeActions.setCurrentForm(testForm);
+                
+                // Try to render directly
+                if (window.formManager) {
+                    window.formManager.renderFields(testForm.fields);
+                    updateStatus('formTestStatus', '✅ Form rendering test completed', 'success');
+                } else {
+                    updateStatus('formTestStatus', '❌ formManager not available', 'error');
+                }
+            } catch (error) {
+                updateStatus('formTestStatus', `❌ Form rendering failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function checkStoreState() {
+            if (!window.appStore) {
+                updateStatus('storeState', '❌ appStore not available', 'error');
+                return;
+            }
+            
+            const state = appStore.getState();
+            const stateDiv = document.getElementById('storeState');
+            stateDiv.innerHTML = `<pre>${JSON.stringify(state, null, 2)}</pre>`;
+        }
+        
+        // Auto-check on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                checkServices();
+                testConnection();
+            }, 1000);
+        });
+    </script>
+</body>
+</html> 

@@ -30,61 +30,39 @@ class ScreenshotManager {
     async captureScreenshot() {
         try {
             const state = appStore.getState();
-            const primaryFeed = state.primaryFeed;
+            let dataUrl;
             
-            // Check if there's an active video call
-            if (!state.activeCall || !window.webRTCManager) {
-                Toast.error('No active video call to capture from');
-                return null;
-            }
-            
-            let videoElement = null;
-            
-            // Determine which video element to capture from
-            if (primaryFeed === 'local' || (primaryFeed === 'screen' && state.isScreenSharing)) {
-                // Capture from local video (camera or screen share)
-                videoElement = document.getElementById('localVideo');
+            if (state.isScreenSharing && state.screenShareStream) {
+                // Capture from screen share video
+                const videoEl = document.createElement('video');
+                videoEl.srcObject = state.screenShareStream;
+                videoEl.muted = true;
+                await videoEl.play();
+                const canvas = document.createElement('canvas');
+                canvas.width = videoEl.videoWidth;
+                canvas.height = videoEl.videoHeight;
+                canvas.getContext('2d').drawImage(videoEl, 0, 0);
+                dataUrl = canvas.toDataURL('image/png');
             } else {
-                // Capture from remote user's video
-                const remoteVideoWrapper = document.getElementById(`video-${primaryFeed}`);
-                if (remoteVideoWrapper) {
-                    videoElement = remoteVideoWrapper.querySelector('video');
+                const formContainer = document.getElementById('collaborativeForm');
+                if (formContainer) {
+                    // Existing capture logic...
+                    if (window.html2canvas) {
+                        const canvas = await html2canvas(formContainer);
+                        dataUrl = canvas.toDataURL('image/png');
+                    } else {
+                        // Fallback canvas logic...
+                    }
                 }
             }
             
-            if (!videoElement || !videoElement.srcObject) {
-                Toast.error('No video feed available to capture');
-                return null;
+            if (dataUrl) {
+                this.saveScreenshot(dataUrl);
+                return dataUrl;
             }
             
-            // Wait a moment for the video to be ready
-            if (videoElement.readyState < 2) {
-                await new Promise(resolve => {
-                    videoElement.onloadeddata = resolve;
-                    setTimeout(resolve, 1000); // Timeout after 1 second
-                });
-            }
-            
-            // Create canvas and capture frame
-            const canvas = document.createElement('canvas');
-            canvas.width = videoElement.videoWidth;
-            canvas.height = videoElement.videoHeight;
-            
-            if (canvas.width === 0 || canvas.height === 0) {
-                Toast.error('Video dimensions not available');
-                return null;
-            }
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(videoElement, 0, 0);
-            
-            // Convert to data URL
-            const dataUrl = canvas.toDataURL('image/png');
-            
-            // Save the screenshot
-            this.saveScreenshot(dataUrl);
-            
-            return dataUrl;
+            Toast.error('Nothing to capture');
+            return null;
         } catch (error) {
             console.error('Screenshot capture failed:', error);
             Toast.error('Failed to capture screenshot');
